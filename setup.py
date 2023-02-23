@@ -1,5 +1,6 @@
-import versioneer
 from setuptools import find_packages, setup
+
+import versioneer
 
 with open("requirements.txt") as install_requires_file:
     install_requires = install_requires_file.read().strip().split("\n")
@@ -11,7 +12,7 @@ with open("README.md") as readme_file:
     readme = readme_file.read()
 
 setup(
-    name="prefect-shell",
+    name="prefect-slurm",
     description="Prefect infrastructure block for integration with slurm.",
     license="Apache License 2.0",
     author="Helmut-Schmidt-University",
