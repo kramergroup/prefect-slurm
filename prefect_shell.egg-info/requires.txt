@@ -1,0 +1,22 @@
+prefect>=2.0.0
+sshfs>=2023.1.0
+anyio>=3.6.0
+
+[dev]
+pytest
+black
+flake8
+mypy
+mkdocs
+mkdocs-material
+mkdocstrings[python]
+isort
+pre-commit
+pytest-asyncio
+mkdocs-gen-files
+interrogate
+coverage
+pillow
+
+[dev:python_version < "3.8"]
+mock
