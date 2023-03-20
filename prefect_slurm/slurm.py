@@ -332,8 +332,12 @@ class SlurmJob(Infrastructure):
             self.working_directory if self.working_directory else ".", flow_run_id
         )
 
-        with self._filesystem() as fs:
+        # Manage garbage collection of fs to avoid long running sessions
+        fs = self._filesystem()
+        try:
             await run_sync_in_worker_thread(fs.mkdir, wdir)
+        finally:
+            del fs
 
         self.logger.debug(
             f"Slurm Job: created flow run dir [{wdir}] on host [{self.host}]"
@@ -358,8 +362,9 @@ class SlurmJob(Infrastructure):
         # Monitor the job until completion
         status_code = await self._watch_job(self._backend, jobid)
 
-        with self._filesystem() as fs:
-
+        # Manage garbage collection of fs to avoid long running sessions
+        fs = self._filesystem()
+        try:
             # Capture output
             if self.stream_output:
                 try:
@@ -383,6 +388,8 @@ class SlurmJob(Infrastructure):
                         f"Slurm Job: could not delete working directory for "
                         f"flow run [{flow_run_id}] on host [{self.host}]"
                     )
+        finally:
+            del fs
 
         return SlurmJobResult(identifier=pid, status_code=status_code)
 
