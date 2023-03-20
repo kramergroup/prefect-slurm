@@ -209,6 +209,7 @@ class CLIBasedSlurmBackend(SlurmBackend):
 
         return asyncssh.connect(
             host=self.host,
+            known_hosts=None,
             options=asyncssh.SSHClientConnectionOptions(
                 username=self.username, password=self.password.get_secret_value()
             ),
