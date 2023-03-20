@@ -332,8 +332,9 @@ class SlurmJob(Infrastructure):
             self.working_directory if self.working_directory else ".", flow_run_id
         )
 
-        fs = self._filesystem()
-        await run_sync_in_worker_thread(fs.mkdir, wdir)
+        with self._filesystem() as fs:
+            await run_sync_in_worker_thread(fs.mkdir, wdir)
+
         self.logger.debug(
             f"Slurm Job: created flow run dir [{wdir}] on host [{self.host}]"
         )
@@ -357,29 +358,31 @@ class SlurmJob(Infrastructure):
         # Monitor the job until completion
         status_code = await self._watch_job(self._backend, jobid)
 
-        # Capture output
-        if self.stream_output:
-            try:
-                with fs.open(
-                    os.path.join(wdir, self.slurm_kwargs["output"]), "r"
-                ) as stream:
-                    print(stream.read())
-                with fs.open(
-                    os.path.join(wdir, self.slurm_kwargs["error"]), "r"
-                ) as stream:
-                    print(stream.read())
-            except Exception:
-                self.logger.error("Could not retrieve logs from slurm job")
+        with self._filesystem() as fs:
 
-        # Cleanup after run
-        if not self.retain_working_directory:
-            try:
-                fs.rmdir(wdir)
-            except Exception:
-                self.logger.error(
-                    f"Slurm Job: could not delete working directory for "
-                    f"flow run [{flow_run_id}] on host [{self.host}]"
-                )
+            # Capture output
+            if self.stream_output:
+                try:
+                    with fs.open(
+                        os.path.join(wdir, self.slurm_kwargs["output"]), "r"
+                    ) as stream:
+                        print(stream.read())
+                    with fs.open(
+                        os.path.join(wdir, self.slurm_kwargs["error"]), "r"
+                    ) as stream:
+                        print(stream.read())
+                except Exception:
+                    self.logger.error("Could not retrieve logs from slurm job")
+
+            # Cleanup after run
+            if not self.retain_working_directory:
+                try:
+                    fs.rmdir(wdir, recursive=True)
+                except Exception:
+                    self.logger.error(
+                        f"Slurm Job: could not delete working directory for "
+                        f"flow run [{flow_run_id}] on host [{self.host}]"
+                    )
 
         return SlurmJobResult(identifier=pid, status_code=status_code)
 
