@@ -283,7 +283,7 @@ class SlurmJob(Infrastructure):
 
     conda_env: str = Field(
         default=None,
-        description="Conda environment name to activet on HPC system "
+        description="Conda environment name to activate on HPC system "
         "(must be pre-installed)",
     )
 
