@@ -1,0 +1,17 @@
+README.md
+setup.cfg
+setup.py
+versioneer.py
+prefect_slurm/__init__.py
+prefect_slurm/_version.py
+prefect_slurm/infrastructure.py
+prefect_slurm/slurm.py
+prefect_slurm/worker.py
+prefect_slurm.egg-info/PKG-INFO
+prefect_slurm.egg-info/SOURCES.txt
+prefect_slurm.egg-info/dependency_links.txt
+prefect_slurm.egg-info/entry_points.txt
+prefect_slurm.egg-info/requires.txt
+prefect_slurm.egg-info/top_level.txt
+tests/test_ssh.py
+tests/test_sshfs.py

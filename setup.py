@@ -13,7 +13,7 @@ with open("README.md") as readme_file:
 
 setup(
     name="prefect-slurm",
-    description="Prefect infrastructure block for integration with slurm.",
+    description="Prefect integration with SLURM workload manager.",
     license="Apache License 2.0",
     author="Helmut-Schmidt-University",
     keywords="prefect",

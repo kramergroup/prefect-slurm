@@ -1,6 +1,6 @@
-prefect>=2.0.0
+prefect>=2.10.0
 sshfs>=2023.1.0
-anyio>=3.6.0
+anyio<4.0.0,>=3.4.0
 
 [dev]
 pytest
