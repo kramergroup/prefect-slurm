@@ -1,7 +1,7 @@
 Metadata-Version: 2.1
 Name: prefect-slurm
-Version: 0+untagged.11.g8e5114d.dirty
-Summary: Prefect infrastructure block for integration with slurm.
+Version: 0+untagged.14.gf3d59a4.dirty
+Summary: Prefect integration with SLURM workload manager.
 Home-page: https://github.com/kramergroup/prefect-slurm
 Author: Helmut-Schmidt-University
 License: Apache License 2.0
