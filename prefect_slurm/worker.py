@@ -10,7 +10,7 @@ TODO:
 import asyncio
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Optional
 
 import anyio.abc
 from prefect.client.schemas import FlowRun
@@ -27,8 +27,6 @@ from pydantic import Field, HttpUrl, validator
 
 from prefect_slurm.api.jobs import JobDefinition
 from prefect_slurm.slurm import APIBasedSlurmBackend, SlurmJobStatus
-
-WalltimeStr = Annotated[str, Field(regex="^[0-2]{1,2}:[0-5][0-9]:[0-5][0-9]")]
 
 
 class SlurmJobConfiguration(BaseJobConfiguration):
@@ -50,7 +48,9 @@ class SlurmJobConfiguration(BaseJobConfiguration):
 
     num_nodes: int = Field(default=1)
     num_processes_per_node: int = Field(default=72)
-    max_walltime: WalltimeStr = Field(default="24:00:00")
+    max_walltime: str = Field(
+        default="24:00:00", regex="^[0-2]{1,2}:[0-5][0-9]:[0-5][0-9]"
+    )
 
     slurm_queue: str = Field(
         template="small",
