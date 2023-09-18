@@ -49,7 +49,7 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     num_nodes: int = Field(default=1)
     num_processes_per_node: int = Field(default=72)
     max_walltime: str = Field(
-        default="24:00:00", regex="^[0-2]{1,2}:[0-5][0-9]:[0-5][0-9]"
+        default="24:00:00", regex="^[0-9]{1,9}:[0-5][0-9]:[0-5][0-9]"
     )
 
     slurm_queue: str = Field(
