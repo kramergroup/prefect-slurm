@@ -38,7 +38,7 @@ class SlurmJobStatus(Enum):
     PENDING = 4
     UNDEFINED = 5
     UNKNOWN = 6
-    CONFIGURING = 8
+    CONFIGURING = 7
 
 
 class SlurmBackend:
