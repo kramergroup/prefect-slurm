@@ -191,8 +191,8 @@ class SlurmWorker(BaseWorker):
     """
 
     type = "slurm"
-    job_configuration = SlurmJobConfiguration
-    job_configuration_variables = SlurmVariables
+    # job_configuration = SlurmJobConfiguration
+    # job_configuration_variables = SlurmVariables
 
     _description = "Execute flow runs as jobs on a SLURM cluster."
 
