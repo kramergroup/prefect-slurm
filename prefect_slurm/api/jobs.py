@@ -25,8 +25,6 @@ echo $SLURM_JOB_ID
 sleep 100
 """
 
-# TimeString = Annotated[str, Field(regex="[0-9]{1,3}:[0-6][0-9]:[0-6][0-9]")]
-
 
 class JobDefinition(BaseModel):
     """
@@ -34,7 +32,11 @@ class JobDefinition(BaseModel):
     """
 
     partition: str
-    time_limit: str = Field(default="01:00:00", description="Maximum Walltime")
+    time_limit: str = Field(
+        default="01:00:00",
+        description="Maximum Walltime",
+        regex="[0-9]{1,3}:[0-6][0-9]:[0-6][0-9]",
+    )
     tasks: int = Field(default=72, description="Number of MPI tasks")
     name: str = Field(default="my-job", description="Name of the SLURM job")
     nodes: str = Field(default=1, description="Number of nodes for the SLURM job")
