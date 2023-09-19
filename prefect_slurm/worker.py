@@ -238,7 +238,7 @@ class SlurmWorker(BaseWorker):
         backend = APIBasedSlurmBackend(
             endpoint=configuration.slurm_url,
             username=configuration.slurm_user,
-            token=configuration.slurm_token.value,
+            token=configuration.slurm_token.get(),
         )
 
         env = configuration._base_environment()
