@@ -240,7 +240,7 @@ class SlurmWorker(BaseWorker):
             username=configuration.slurm_user,
             token=configuration.slurm_token.get(),
         )
-
+        print(configuration.slurm_token.get())
         env = configuration._base_environment()
         env.update(configuration.env)
 
