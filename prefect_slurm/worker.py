@@ -183,13 +183,13 @@ class SlurmVariables(BaseVariables):
     )
 
     slurm_token: Secret = Field(
-        default="api-token-secret-name",
+        default=None,
         title="API Token",
         description="The bearer token to authenticate with the Slurm API.",
     )
 
     slurm_url: HttpUrl = Field(
-        default="http://slurm-api-host",
+        default=HttpUrl("http://slurm-api-host"),
         title="API URL",
         description="URL of the Slurm API endpoint.",
     )
