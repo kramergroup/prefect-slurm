@@ -334,5 +334,6 @@ def _extract_valid_json(value: str) -> Any:
     r = regex.compile("\{(?:[^}{]+|(?R))*+\}")  # noqa: W605
     m = r.match(value)
     if not m:
+        print(value)
         raise RuntimeError("Slurm API did not return valid JSON.")
     return json.loads(m.group(0))

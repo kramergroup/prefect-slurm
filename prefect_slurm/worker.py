@@ -254,7 +254,6 @@ class SlurmWorker(BaseWorker):
             environment=configuration.env,
         )
 
-        print(script)
         slurm_job_id = await backend.submit(job_def, script)
 
         flow_run_logger.info(f"Slurm job {slurm_job_id} submitted.")
