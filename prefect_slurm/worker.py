@@ -54,13 +54,13 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     )
 
     slurm_queue: str = Field(
-        default="small",
+        template="small",
         title="Slurm Queue",
         description="The Slurm queue jobs are submitted to.",
     )
 
     slurm_user: str = Field(
-        default="username",
+        template="username",
         title="Username",
         description="The username used to authenticate with the slurm API.",
     )
