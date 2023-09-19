@@ -72,7 +72,7 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     )
 
     slurm_url: HttpUrl = Field(
-        default="http://slurm-api-host",
+        default=None,
         title="API URL",
         description="URL of the Slurm API endpoint.",
     )
