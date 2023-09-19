@@ -54,13 +54,13 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     )
 
     slurm_queue: str = Field(
-        template="small",
+        default="small",
         title="Slurm Queue",
         description="The Slurm queue jobs are submitted to.",
     )
 
     slurm_user: str = Field(
-        template="username",
+        default="username",
         title="Username",
         description="The username used to authenticate with the slurm API.",
     )
@@ -194,6 +194,12 @@ class SlurmVariables(BaseVariables):
         description="URL of the Slurm API endpoint.",
     )
 
+    slurm_queue: str = Field(
+        default="small",
+        title="Slurm Queue",
+        description="The Slurm queue jobs are submitted to.",
+    )
+
 
 class SlurmWorkerResult(BaseWorkerResult):
     """Contains information about the final state of a completed slurm job"""
@@ -240,7 +246,7 @@ class SlurmWorker(BaseWorker):
             username=configuration.slurm_user,
             token=configuration.slurm_token.get(),
         )
-        print(configuration.slurm_token.get())
+
         env = configuration._base_environment()
         env.update(configuration.env)
 
@@ -311,7 +317,7 @@ class SlurmWorker(BaseWorker):
         backend = APIBasedSlurmBackend(
             endpoint=configuration.slurm_url,
             username=configuration.slurm_user,
-            token=configuration.slurm_token,
+            token=configuration.slurm_token.get(),
         )
 
         status = None
@@ -321,6 +327,7 @@ class SlurmWorker(BaseWorker):
             SlurmJobStatus.PENDING,
             SlurmJobStatus.PREEMPTED,
             SlurmJobStatus.RUNNING,
+            SlurmJobStatus.CONFIGURING,
         ]:
             status = await backend.status(job_id)
             await asyncio.sleep(configuration.update_interval_sec)
