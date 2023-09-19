@@ -189,7 +189,7 @@ class SlurmVariables(BaseVariables):
     )
 
     slurm_url: HttpUrl = Field(
-        template="http://slurm-api-host",
+        template=HttpUrl(url="http://slurm-api-host"),
         title="API URL",
         description="URL of the Slurm API endpoint.",
     )
