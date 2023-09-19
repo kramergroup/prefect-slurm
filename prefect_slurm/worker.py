@@ -77,8 +77,6 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         description="URL of the Slurm API endpoint.",
     )
 
-    conda_env: Optional[str] = Field(default=None)
-
     update_interval_sec: int = Field(
         default=30,
         title="Update Interval",
@@ -168,14 +166,6 @@ class SlurmVariables(BaseVariables):
         description="Interval in seconds to poll the API for job updates",
     )
 
-    conda_env: Optional[str] = Field(
-        default=None,
-        title="Conda Environment",
-        description="Name of the Conda environment to run in. "
-        "The environment must be pre-installed on the "
-        "infrastructure environment",
-    )
-
     slurm_user: str = Field(
         default="username",
         title="Username",
@@ -258,11 +248,16 @@ class SlurmWorker(BaseWorker):
             nodes=configuration.num_nodes,
             current_working_directory=configuration.working_dir,
             environment=configuration.env,
+            name=f"prefect-{flow_run.id}",
         )
 
         slurm_job_id = await backend.submit(job_def, script)
 
-        flow_run_logger.info(f"Slurm job {slurm_job_id} submitted.")
+        flow_run_logger.info(
+            f"Submitted job '{job_def.name}' to {configuration.name} "
+            f"using account {configuration.slurm_user} with "
+            f"slurm job id {slurm_job_id}."
+        )
 
         if task_status:
             # Use a unique ID to mark the run as started. This ID is later used to
@@ -339,14 +334,8 @@ class SlurmWorker(BaseWorker):
         Generate the submit script for the slurm job
         """
         script = ["#!/bin/bash"]
-        script += ["source /beegfs/home/k/kramerd/.bashrc"]
-        # script += self.pre_run
-        command = configuration.command or self._base_flow_run_command()
 
-        if configuration.conda_env:
-            script += [f"conda run -n {configuration.conda_env} {command}"]
-        else:
-            script += [command]
-        # script += self.post_run
+        command = configuration.command or self._base_flow_run_command()
+        script += [command]
 
         return "\n".join(script)

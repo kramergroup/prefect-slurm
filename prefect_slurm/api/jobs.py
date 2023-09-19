@@ -38,7 +38,7 @@ class JobDefinition(BaseModel):
         regex="[0-9]{1,3}:[0-6][0-9]:[0-6][0-9]",
     )
     tasks: int = Field(default=72, description="Number of MPI tasks")
-    name: str = Field(default="my-job", description="Name of the SLURM job")
+    name: str = Field(default="prefect", description="Name of the SLURM job")
     nodes: str = Field(default=1, description="Number of nodes for the SLURM job")
     current_working_directory: Path = Field(description="Working directory")
     environment: dict[str, str] = Field(
