@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 import anyio.abc
+from prefect.blocks.system import Secret
 from prefect.client.schemas import FlowRun
 from prefect.server.schemas.core import Flow
 from prefect.server.schemas.responses import DeploymentResponse
@@ -64,7 +65,7 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         description="The username used to authenticate with the slurm API.",
     )
 
-    slurm_token: str = Field(
+    slurm_token: Secret = Field(
         template="api-token",
         title="API Token",
         description="The bearer token to authenticate with the Slurm API.",
