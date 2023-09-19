@@ -54,25 +54,25 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     )
 
     slurm_queue: str = Field(
-        template="small",
+        default="small",
         title="Slurm Queue",
         description="The Slurm queue jobs are submitted to.",
     )
 
     slurm_user: str = Field(
-        template="username",
+        default="username",
         title="Username",
         description="The username used to authenticate with the slurm API.",
     )
 
     slurm_token: Secret = Field(
-        template="api-token",
+        default="api-token-secret-name",
         title="API Token",
         description="The bearer token to authenticate with the Slurm API.",
     )
 
     slurm_url: HttpUrl = Field(
-        template="http://slurm-api-host",
+        default="http://slurm-api-host",
         title="API URL",
         description="URL of the Slurm API endpoint.",
     )
@@ -177,19 +177,19 @@ class SlurmVariables(BaseVariables):
     )
 
     slurm_user: str = Field(
-        template="username",
+        default="username",
         title="Username",
         description="The username used to authenticate with the slurm API.",
     )
 
     slurm_token: Secret = Field(
-        template="api-token",
+        default="api-token-secret-name",
         title="API Token",
         description="The bearer token to authenticate with the Slurm API.",
     )
 
     slurm_url: HttpUrl = Field(
-        template=HttpUrl(url="http://slurm-api-host"),
+        default="http://slurm-api-host",
         title="API URL",
         description="URL of the Slurm API endpoint.",
     )
