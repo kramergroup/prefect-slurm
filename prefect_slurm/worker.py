@@ -66,7 +66,7 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     )
 
     slurm_token: Secret = Field(
-        default="api-token-secret-name",
+        default=None,
         title="API Token",
         description="The bearer token to authenticate with the Slurm API.",
     )
