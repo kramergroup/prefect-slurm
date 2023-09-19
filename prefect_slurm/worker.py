@@ -176,6 +176,24 @@ class SlurmVariables(BaseVariables):
         "infrastructure environment",
     )
 
+    slurm_user: str = Field(
+        template="username",
+        title="Username",
+        description="The username used to authenticate with the slurm API.",
+    )
+
+    slurm_token: Secret = Field(
+        template="api-token",
+        title="API Token",
+        description="The bearer token to authenticate with the Slurm API.",
+    )
+
+    slurm_url: HttpUrl = Field(
+        template="http://slurm-api-host",
+        title="API URL",
+        description="URL of the Slurm API endpoint.",
+    )
+
 
 class SlurmWorkerResult(BaseWorkerResult):
     """Contains information about the final state of a completed slurm job"""
