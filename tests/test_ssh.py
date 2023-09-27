@@ -8,7 +8,7 @@ async def test():
         host="hsuper-login.hsu-hh.de",
         options=asyncssh.SSHClientConnectionOptions(
             username="kramerd",
-            password="@Annika02102011",
+            password=None,
             known_hosts=None,
         ),
     ) as c:
