@@ -1,4 +1,4 @@
-from .infrastructure import SlurmJob  # noqa
 from . import _version
+from .worker import SlurmWorker  # noqa
 
-__version__ = _version.get_versions()["version"]
+__version__ = _version.__version__

@@ -79,16 +79,21 @@ class APIBasedSlurmBackend(SlurmBackend):
     endpoint (URL)  The URL for the SLURM API endpoint
     username (str)  The username to authenticate with the API
     token    (str)  The token to authenticate the user at the API
+    insecure (bool) Allow insecure connections to API endpoints
     """
 
     endpoint: URL
     username: str
     token: str
+    insecure: bool
 
-    def __init__(self, endpoint: URL, username: str, token: str):
+    def __init__(
+        self, endpoint: URL, username: str, token: str, insecure: bool = False
+    ):
         self.endpoint = endpoint
         self.username = username
         self.token = token
+        self.insecure = insecure
 
     async def submit(
         self,
@@ -211,6 +216,8 @@ class CLIBasedSlurmBackend(SlurmBackend):
                 return SlurmJobStatus.FAILED
             if status == "RUNNING":
                 return SlurmJobStatus.RUNNING
+            if status == "CONFIGURING":
+                return SlurmJobStatus.CONFIGURING
 
             return SlurmJobStatus.UNKNOWN
         except Exception:

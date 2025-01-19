@@ -1,0 +1,17 @@
+{
+  "job_configuration": {
+    "working_dir": "~",
+    "queue": "small",
+    "connection_name": "hsuper-ssh-connection"
+  },
+  "variables": {
+    "type": "object",
+    "properties": {
+      "working_dir": {
+        "title": "Working directory",
+        "description": "Working directory for the job",
+        "type": "string"
+      }
+    }
+  }
+}
