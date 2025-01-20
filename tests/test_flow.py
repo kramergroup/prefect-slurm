@@ -28,5 +28,5 @@ if __name__ == "__main__":
             tag="dev",
             platform="linux/amd64",
         ),
-        job_variables={"env": {"TEST_ENV_VAR": "test"}},
+        job_variables={"queue": "dev", "max_walltime": "00:05:00"},
     )
