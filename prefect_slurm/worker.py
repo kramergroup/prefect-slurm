@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 import anyio.abc
+from jinja2 import Template
 from prefect.blocks.core import Block
 from prefect.client.schemas import FlowRun
 from prefect.server.schemas.core import Flow
@@ -138,6 +139,22 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         description="Interval in seconds to poll the API for job updates",
     )
 
+    script_template: Optional[str] = Field(
+        default=None,
+        title="Submit script template",
+        description=""""
+            Allows to provide a template for generating submit scripts. If provided,
+            a custom submit script is generated. This allows to tweak the
+            execution environment.
+        """,
+    )
+
+    image: Optional[str] = Field(
+        default=None,
+        title="Docker image",
+        description="The name of a docker image for packaging the code",
+    )
+
     @field_validator("working_dir")
     @classmethod
     def validate_working_directory(cls, v):
@@ -146,6 +163,19 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         """
         if v:
             return relative_path_to_current_platform(v)
+        return v
+
+    @field_validator("script_template", mode="before")
+    @classmethod
+    def ensure_script_template_is_string(cls, v):
+        """
+        Ensures that the script template is a single string with newline
+        characters if needed.
+        """
+
+        if type(v) == list:
+            return "\n".join(v)
+
         return v
 
     def prepare_for_flow_run(
@@ -234,6 +264,21 @@ class SlurmVariables(BaseVariables):
             The name of a connection block to access the SLURM manager. This can either
             be a API endpoint or a SSH connection.
         """,
+    )
+
+    script_template: Optional[str] = Field(
+        default=None,
+        title="Submit script template",
+        description=""""
+            Allows to provide a template for generating submit scripts. If provided,
+            a custom submit script is generated. This allows to tweak the
+            execution environment.
+        """,
+    )
+
+    image: Optional[str] = Field(
+        title="Docker image",
+        description="The name of a docker image for packaging the code",
     )
 
 
@@ -337,6 +382,7 @@ class SlurmWorker(BaseWorker):
         """
         Generate a command for a flow run job.
         """
+
         return "python -m prefect.engine"
 
     async def _create_backend(
@@ -403,9 +449,35 @@ class SlurmWorker(BaseWorker):
         """
         Generate the submit script for the slurm job
         """
-        script = ["#!/bin/bash"]
 
-        command = configuration.command or self._base_flow_run_command()
-        script += [command]
+        try:
 
-        return "\n".join(script)
+            return self._submit_script_from_template(configuration)
+
+        except ValueError:
+
+            script = ["#!/bin/bash"]
+
+            command = configuration.command or self._base_flow_run_command()
+            script += [command]
+
+            return "\n".join(script)
+
+    def _submit_script_from_template(self, configuration: SlurmJobConfiguration) -> str:
+        """
+        Creates the submit script based on a provided template.
+        """
+
+        if configuration.script_template is None:
+            raise ValueError("Script template required")
+
+        template = Template(configuration.script_template)
+
+        return template.render(
+            working_dir=configuration.working_dir,
+            num_nodes=configuration.num_nodes,
+            num_processes_per_node=configuration.num_processes_per_node,
+            max_walltime=configuration.max_walltime,
+            queue=configuration.queue,
+            image=configuration.image,
+        )

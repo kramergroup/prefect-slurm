@@ -169,8 +169,12 @@ class CLIBasedSlurmBackend(SlurmBackend):
             in_stream=run_script,
             grace_seconds=grace_seconds,
         )
-
-        return int(result.stdout.strip())
+        try:
+            return int(result.stdout.strip())
+        except ValueError:
+            # If job submission fails, the returned value is not a number. Pass the
+            # root cause back up as RuntimeError.
+            raise RuntimeError(result.stderr.strip())
 
     async def kill(self, jobid: int, grace_seconds: int = 30):
         """

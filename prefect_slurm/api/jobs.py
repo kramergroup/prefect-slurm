@@ -117,7 +117,7 @@ class JobDefinition(BaseModel):
             "time": self.time_limit,
             "ntasks": self.tasks,
             "nodes": self.nodes,
-            "chdir": self.current_working_directory,
+            "chdir": self.current_working_directory.as_posix(),
         }
         if self.environment:
             res["export"] = ",".join([k + "=" + v for k, v in self.environment.items()])

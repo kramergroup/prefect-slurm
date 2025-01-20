@@ -1,0 +1,2 @@
+prefect
+httpx[socks]

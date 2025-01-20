@@ -1,8 +1,23 @@
 {
   "job_configuration": {
-    "working_dir": "~",
-    "queue": "small",
-    "connection_name": "hsuper-ssh-connection"
+    "image": "{{ image }}",
+    "working_dir": "{{ working_dir }}",
+    "connection_name": "hsuper-ssh-connection",
+    "queue": "{{ queue }}",
+    "num_nodes": "{{ num_nodes }}",
+    "num_processes_per_node": "{{ num_processes_per_node }}",
+    "max_walltime": "{{ max_walltime }}",
+    "script_template": [
+      "#!/bin/bash",
+      "#SBATCH --mail-type=FAIL,TIME_LIMIT_90  ### possible values (NONE, BEGIN, END, FAIL, REQUEUE, ALL)",
+      "ssh -D 9000 10.10.100.1 -fN",
+      "export HTTPS_PROXY=socks5://localhost:9000 HTTP_PROXY=socks5://localhost:9000",
+      "{% if image %}",
+      "singularity run docker://{{ image }}",
+      "{% else %}",
+      "prefect flow-run execute",
+      "{% endif %}"
+    ]
   },
   "variables": {
     "type": "object",
@@ -10,6 +25,36 @@
       "working_dir": {
         "title": "Working directory",
         "description": "Working directory for the job",
+        "default": "~",
+        "type": "string"
+      },
+      "image": {
+        "title": "docker image",
+        "description": "The docker image containing the flow code",
+        "type": "string"
+      },
+      "num_nodes": {
+        "title": "number of compute nodes",
+        "description": "The number of nodes to be allocated per flow run",
+        "default": 1,
+        "type": "integer"
+      },
+      "num_processes_per_node": {
+        "title": "number of processes per node",
+        "description": "number of MPI processes per node. Usually equal to the number of CPUs per node.",
+        "default": 72,
+        "type": "integer"
+      },
+      "max_walltime": {
+        "title": "maximum walltime",
+        "description": "The maximum walltime allocated to a flow run. Set sensibly, this can help starting SLURM jobs with higher priority.",
+        "default": "24:00:00",
+        "type": "string"
+      },
+      "queue": {
+        "title": "SLURM queue",
+        "description": "The SLURM partition to send jobs to. Depending on the cluster configutation, this has implications on priority, walltime, execution node types, etc.",
+        "default": "small",
         "type": "string"
       }
     }
