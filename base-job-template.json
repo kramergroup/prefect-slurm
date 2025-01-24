@@ -50,7 +50,7 @@
       "max_walltime": {
         "title": "maximum walltime",
         "description": "The maximum walltime allocated to a flow run. Set sensibly, this can help starting SLURM jobs with higher priority.",
-        "default": "24:00:00",
+        "default": "00:05:00",
         "type": "string"
       },
       "queue": {
