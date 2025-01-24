@@ -108,7 +108,7 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     stream_output: bool = Field(default=True)
 
     working_dir: Optional[Path] = Field(
-        default=Path("~"),
+        default=None,
         title="Working directory",
         description="Working directory for the job",
     )
