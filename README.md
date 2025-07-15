@@ -20,8 +20,6 @@ Requires an installation of Python 3.7+.
 
 We recommend using a Python virtual environment manager such as pipenv, conda or virtualenv.
 
-This infrastructure block is designed to work with Prefect 2. For more information about how to use Prefect, please refer to the [Prefect documentation](https://orion-docs.prefect.io/).
-
 ### Feedback
 
 If you encounter any bugs while using `prefect-slurm`, feel free to open an issue in the [prefect-slurm](https://github.com/kramergroup/prefect-slurm) repository.
