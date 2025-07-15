@@ -7,6 +7,8 @@
     "num_nodes": "{{ num_nodes }}",
     "num_processes_per_node": "{{ num_processes_per_node }}",
     "max_walltime": "{{ max_walltime }}",
+    "pre_command": "{{ pre_command }}",
+    "post_command": "{{ post_command }}",
     "script_template": [
       "#!/bin/bash",
       "#SBATCH --mail-type=FAIL,TIME_LIMIT_90  ### possible values (NONE, BEGIN, END, FAIL, REQUEUE, ALL)",
@@ -23,7 +25,7 @@
       "echo \"Starting prefect\"",
       "mkdir ${PREFECT__FLOW_RUN_ID}",
       "cd ${PREFECT__FLOW_RUN_ID}",
-      "{% if image is defined %}",
+      "{% if image is defined and image != None and image != ''%}",
       "srun singularity run --bind $(pwd):/run --pwd /run docker://{{ image }}",
       "{% else %}",
       "prefect flow-run execute",
