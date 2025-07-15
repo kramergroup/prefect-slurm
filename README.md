@@ -5,45 +5,16 @@ infrastructure mananged by [SLURM](https://slurm.schedmd.com).
 
 ## Getting started
 
-Create an infrastructure block
-
-```python
-import prefect_slurm
-
-from prefect_slurm import SlurmJob
-
-def create_slurm_job() -> SlurmJob:
-
-    infra = SlurmJob(
-      host="<DNS name of the HPC login node>",
-      username="<USERNAME>",
-      slurm_kwargs={
-        "jobname": "prefect",
-        "partition": "small",
-        "nodes": "1",
-        "ntasks-per-node": "72"
-      },
-    )
-
-    return infra
-
-if __name__ == "__main__":
-  create_slurm_job().save("hpc", overwrite=True)
-```
-
-Configure a deployment to run on slurm
+This integration requires a dedicated work-pool type that needs to be registered with
+the prefect-api:
 
 ```bash
-prefect deployment build my_flow.py:hpc_job -ib slurmjob/hpc --name hpc/job
+prefect work-pool create --type slurm --base-job-template ./base-job-template.json slurm-pool --overwrite
 ```
 
-### Installation
-
-Install `prefect-shell` with `pip`:
-
-```bash
-pip install -U 'prefect-slurm @ git+https://github.com/kramergroup/prefect-slurm'
-```
+Once the work pool exists, a worker is needed to pull flow runs and submit them to the slurm infrastructure. This
+worker needs access to the prefect API as well as the slurm cluster (either via ssh or the slurm API). This can 
+be achieved by running the provided docker container on premises.
 
 Requires an installation of Python 3.7+.
 
