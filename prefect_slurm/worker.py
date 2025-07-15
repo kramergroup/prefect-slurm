@@ -155,6 +155,28 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         description="The name of a docker image for packaging the code",
     )
 
+    pre_command: Optional[str] = Field(
+        default=None,
+        title="Pre-run command",
+        description="""
+            A shell command to execute before the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to initiate environments etc.
+        """,
+        examples=["conda activate prefect", "conda create -n mytempenv"],
+    )
+
+    post_command: Optional[str] = Field(
+        default=None,
+        title="Post-run command",
+        description="""
+            A shell command to execute after the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to clean-up environments etc.
+        """,
+        examples=["conda remove mytempenv"],
+    )
+
     @field_validator("working_dir")
     @classmethod
     def validate_working_directory(cls, v):
@@ -269,7 +291,7 @@ class SlurmVariables(BaseVariables):
     script_template: Optional[str] = Field(
         default=None,
         title="Submit script template",
-        description=""""
+        description="""
             Allows to provide a template for generating submit scripts. If provided,
             a custom submit script is generated. This allows to tweak the
             execution environment.
@@ -279,6 +301,28 @@ class SlurmVariables(BaseVariables):
     image: Optional[str] = Field(
         title="Docker image",
         description="The name of a docker image for packaging the code",
+    )
+
+    pre_command: Optional[str] = Field(
+        default=None,
+        title="Pre-run command",
+        description="""
+            A shell command to execute before the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to initiate environments etc.
+        """,
+        examples=["conda activate prefect", "conda create -n mytempenv"],
+    )
+
+    post_command: Optional[str] = Field(
+        default=None,
+        title="Post-run command",
+        description="""
+            A shell command to execute after the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to clean-up environments etc.
+        """,
+        examples=["conda remove mytempenv"],
     )
 
 
@@ -480,4 +524,6 @@ class SlurmWorker(BaseWorker):
             max_walltime=configuration.max_walltime,
             queue=configuration.queue,
             image=configuration.image,
+            pre_command=configuration.pre_command,
+            post_command=configuration.post_command,
         )

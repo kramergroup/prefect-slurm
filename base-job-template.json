@@ -16,6 +16,10 @@
       "echo \"Proxy started\"",
       "export https_proxy=http://localhost:8087 http_proxy=http://localhost:8087",
       "export HTTPS_PROXY=http://localhost:8087 HTTP_PROXY=http://localhost:8087",
+      "{%if pre_command is defined %}",
+      "echo \"Running pre-command [$pre_command]\"",
+      "${pre_command}",
+      "{% endif %}",
       "echo \"Starting prefect\"",
       "mkdir ${PREFECT__FLOW_RUN_ID}",
       "cd ${PREFECT__FLOW_RUN_ID}",
@@ -23,6 +27,10 @@
       "srun singularity run --bind $(pwd):/run --pwd /run docker://{{ image }}",
       "{% else %}",
       "prefect flow-run execute",
+      "{% endif %}",
+      "{%if post_command is defined %}",
+      "echo \"Running post-command [$post_command]\"",
+      "${post_command}",
       "{% endif %}"
     ]
   },
@@ -38,6 +46,16 @@
       "image": {
         "title": "docker image",
         "description": "The docker image containing the flow code",
+        "type": "string"
+      },
+      "pre_command": {
+        "title": "pre-run command",
+        "description": "Shell command executed before flow run (e.g., to initiate environments)",
+        "type": "string"
+      },
+      "post_command": {
+        "title": "post-run command",
+        "description": "Shell command executed after flow run (e.g., to clean-up environments)",
         "type": "string"
       },
       "num_nodes": {
