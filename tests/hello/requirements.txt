@@ -1,0 +1,3 @@
+prefect
+httpx[socks]
+websockets_proxy

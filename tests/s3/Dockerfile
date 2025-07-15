@@ -1,7 +1,7 @@
 FROM python:3.12
 
 COPY ./requirements.txt /src/requirements.txt
-COPY test_flow.py /src/test_flow.py
+COPY flow.py /src/
 
 # This is needed because singularity does not respect the WORKDIR directive
 # and executes in a mounted home directory by default.
@@ -11,4 +11,7 @@ ENV PYTHONPATH=/src:${PYTHONPATH}
 
 RUN pip install -r /src/requirements.txt
 
+ENV PREFECT_DEBUG_MODE=1
+
+# CMD [ "prefect", "flow-run", "execute" ]
 CMD [ "prefect", "flow-run", "execute" ]
