@@ -527,3 +527,10 @@ class SlurmWorker(BaseWorker):
             pre_command=configuration.pre_command,
             post_command=configuration.post_command,
         )
+
+
+if __name__ == "__main__":
+
+    from prefect.cli.worker import start
+
+    start(worker_name="debug", work_pool_name="hsuper-test", worker_type="slurm")
