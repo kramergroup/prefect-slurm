@@ -1,11 +1,12 @@
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: F401
 
 import pytest
 from prefect.client.schemas import FlowRun
 from prefect.server.schemas.core import CreatedBy
 from pydantic import SecretStr
 
+from prefect_slurm.slurm import APIBasedSlurmBackend, CLIBasedSlurmBackend  # noqa: F401
 from prefect_slurm.worker import (
     SlurmAPIConnection,
     SlurmJobConfiguration,
