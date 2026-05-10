@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 
 import httpx
 import regex
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 DEFAULT_SCRIPT = """#!/bin/bash
 echo "hello script"
@@ -32,14 +32,27 @@ class JobDefinition(BaseModel):
     """
 
     partition: str
+
     time_limit: str = Field(
         default="01:00:00",
         description="Maximum Walltime",
-        regex="[0-9]{1,3}:[0-6][0-9]:[0-6][0-9]",
+        pattern="[0-9]{1,3}:[0-6][0-9]:[0-6][0-9]",
     )
-    tasks: int = Field(default=72, description="Number of MPI tasks")
-    name: str = Field(default="prefect", description="Name of the SLURM job")
-    nodes: str = Field(default=1, description="Number of nodes for the SLURM job")
+
+    tasks: int = Field(
+        default=72, title="Number of MPI tasks", description="Number of MPI tasks"
+    )
+
+    name: str = Field(
+        default="prefect", title="Job title", description="Name of the SLURM job"
+    )
+
+    nodes: int = Field(
+        default=1,
+        title="Number of nodes",
+        description="Number of nodes for the SLURM job",
+    )
+
     current_working_directory: Path = Field(description="Working directory")
     environment: dict[str, str] = Field(
         default={
@@ -49,12 +62,14 @@ class JobDefinition(BaseModel):
         description="Environment variables",
     )
 
-    @validator("current_working_directory")
+    @field_validator("current_working_directory", mode="before")
     def validate_current_working_directory(cls, v):
         """
         ensure that the provided working directory is a valid path.
         """
-        return Path(v)
+        if isinstance(v, str):
+            return Path(v)
+        return v
 
     @staticmethod
     def from_kwargs(slurm_kwargs: dict[str, str]):
@@ -98,14 +113,19 @@ class JobDefinition(BaseModel):
         """
 
         res = {
-            "p": self.partition,
-            "t": self.time_limit,
-            "n": self.tasks,
-            "N": self.nodes,
-            "chdir": self.current_working_directory,
+            "partition": self.partition,
+            "time": self.time_limit,
+            "ntasks": self.tasks,
+            "nodes": self.nodes,
         }
+
+        if self.current_working_directory:
+            res["chdir"] = str(self.current_working_directory)
+
         if self.environment:
-            res["export"] = ",".join([k + "=" + v for k, v in self.environment.keys()])
+            res["export"] = ",".join([k + "=" + v for k, v in self.environment.items()])
+
+        return res
 
 
 class ResponseError(BaseModel):
@@ -120,7 +140,7 @@ class ResponseError(BaseModel):
     error: str
     source: Optional[str]
 
-    @validator("error_number", always=True)
+    @field_validator("error_number")
     def check_error_code_number(cls, error_number, values):
         """
         ensure that either an error number or an error code is provided.
@@ -130,7 +150,7 @@ class ResponseError(BaseModel):
         return error_number
 
 
-class BasicResonse(BaseModel):
+class BasicResponse(BaseModel):
     """
     Basic model for API responses.
     """
@@ -153,14 +173,14 @@ class SubmitRequest(BaseModel):
     script: str
 
 
-class SubmitResponse(BasicResonse):
+class SubmitResponse(BasicResponse):
     """
     Response to a job submission request
     """
 
     job_id: Optional[int]
 
-    @validator("job_id", always=True)
+    @field_validator("job_id")
     def check_job_id(cls, job_id, values):
         """
         Job ID only required if response has no errors.
@@ -179,14 +199,14 @@ class JobStatus(BaseModel):
     job_state: str
 
 
-class StatusResponse(BasicResonse):
+class StatusResponse(BasicResponse):
     """
     Response of the API to a job status request
     """
 
     jobs: List[JobStatus]
 
-    @validator("jobs", always=True)
+    @field_validator("jobs")
     def check_jobs_or_errors(cls, jobs, values):
         """
         Ensure that either errors or a list of job status information is returned
@@ -198,7 +218,7 @@ class StatusResponse(BasicResonse):
         return jobs
 
 
-class CancelResponse(BasicResonse):
+class CancelResponse(BasicResponse):
     """
     Result of a cancel request
     """
@@ -212,11 +232,15 @@ class APIEndpoint:
     endpoint: str
     username: str
     token: str
+    insecure: bool
 
-    def __init__(self, endpoint: str, username: str, token: str) -> None:
+    def __init__(
+        self, endpoint: str, username: str, token: str, insecure: bool = False
+    ) -> None:
         self.endpoint = endpoint
         self.username = username
         self.token = token
+        self.insecure = insecure
 
     async def submit(
         self, job: JobDefinition, script: str = DEFAULT_SCRIPT, timeout: int = 30
@@ -227,11 +251,21 @@ class APIEndpoint:
 
         payload = SubmitRequest(job=job, script=script)
 
-        async with httpx.AsyncClient() as c:
+        async with httpx.AsyncClient(verify=self.insecure) as c:
+
+            url = HttpUrl.build(
+                scheme=self.endpoint.scheme,
+                username=self.endpoint.username,
+                password=self.endpoint.password,
+                host=self.endpoint.host,
+                port=self.endpoint.port,
+                path=urljoin(self.endpoint.path, "job/submit").replace("//", "/"),
+                fragment=self.endpoint.fragment,
+            )
 
             resp = await c.post(
-                url=urljoin(self.endpoint, "job/submit"),
-                content=payload.json(exclude_none=True),
+                url=str(url),
+                content=payload.model_dump_json(exclude_none=True),
                 headers={
                     "X-SLURM-USER-NAME": self.username,
                     "X-SLURM-USER-TOKEN": self.token,

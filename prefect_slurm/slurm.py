@@ -15,7 +15,6 @@ the CLI-based client is the way to go.
 """
 
 import abc
-import asyncio
 from enum import Enum
 from io import TextIOBase
 
@@ -39,6 +38,7 @@ class SlurmJobStatus(Enum):
     UNDEFINED = 5
     UNKNOWN = 6
     CONFIGURING = 7
+    CANCELLED = 8
 
 
 class SlurmBackend:
@@ -79,16 +79,21 @@ class APIBasedSlurmBackend(SlurmBackend):
     endpoint (URL)  The URL for the SLURM API endpoint
     username (str)  The username to authenticate with the API
     token    (str)  The token to authenticate the user at the API
+    insecure (bool) Allow insecure connections to API endpoints
     """
 
     endpoint: URL
     username: str
     token: str
+    insecure: bool
 
-    def __init__(self, endpoint: URL, username: str, token: str):
+    def __init__(
+        self, endpoint: URL, username: str, token: str, insecure: bool = False
+    ):
         self.endpoint = endpoint
         self.username = username
         self.token = token
+        self.insecure = insecure
 
     async def submit(
         self,
@@ -164,8 +169,12 @@ class CLIBasedSlurmBackend(SlurmBackend):
             in_stream=run_script,
             grace_seconds=grace_seconds,
         )
-
-        return int(result.stdout.strip())
+        try:
+            return int(result.stdout.strip())
+        except ValueError:
+            # If job submission fails, the returned value is not a number. Pass the
+            # root cause back up as RuntimeError.
+            raise RuntimeError(result.stderr.strip())
 
     async def kill(self, jobid: int, grace_seconds: int = 30):
         """
@@ -193,10 +202,10 @@ class CLIBasedSlurmBackend(SlurmBackend):
             grace_seconds=grace_seconds,
         )
 
-        # Status command exits with non-zero exit code if jobid is not found.
-        # This includes finished jobs that have been removed from the queue!!!!
+        # squeue exits non-zero when the job is not found, which happens for
+        # both completed and failed jobs after they age out of the queue.
         if result.exit_status != 0:
-            return SlurmJobStatus.UNDEFINED
+            return await self._sacct_status(jobid, grace_seconds)
 
         try:
             status, exit_code = [v.strip() for v in result.stdout.split()[0:2]]
@@ -211,6 +220,8 @@ class CLIBasedSlurmBackend(SlurmBackend):
                 return SlurmJobStatus.FAILED
             if status == "RUNNING":
                 return SlurmJobStatus.RUNNING
+            if status == "CONFIGURING":
+                return SlurmJobStatus.CONFIGURING
 
             return SlurmJobStatus.UNKNOWN
         except Exception:
@@ -258,7 +269,7 @@ class CLIBasedSlurmBackend(SlurmBackend):
         :jobid: the jobid that references the job in slurm
         """
 
-        return f"scancel ${jobid}"
+        return f"scancel {jobid}"
 
     def _status_command(self, jobid) -> str:
         """
@@ -283,59 +294,34 @@ class CLIBasedSlurmBackend(SlurmBackend):
             ),
         )
 
-    class APIBasedSlurmBackend(SlurmBackend):
+    async def _sacct_status(
+        self, jobid: int, grace_seconds: int = 30
+    ) -> SlurmJobStatus:
         """
-        API-based backend to control a slurm scheduler
+        Query the final state of a completed job via sacct.
 
-        Parameters
-        ----------
-
-        endpoint (str)    The URL of the SLURM API endpoint
-        username (str)    The username to authenticate with the SLURM API
-        token (str)       The API token (scontrol token lifespan=6000 | cut -d= -f2)
+        Used as a fallback when squeue no longer lists the job. sacct retains
+        history for jobs that have already left the queue.
         """
 
-        api: APIEndpoint
+        result = await self._run_remote_command(
+            cmd=f"sacct -j {jobid} -X --format=State --noheader --parsable2",
+            grace_seconds=grace_seconds,
+        )
 
-        def __init__(self, endpoint: str, username: str, token: str):
-            self.api = APIEndpoint(endpoint=endpoint, username=username, token=token)
+        if result.exit_status != 0 or not result.stdout.strip():
+            return SlurmJobStatus.UNDEFINED
 
-        async def submit(
-            self,
-            slurm_kwargs: dict[str, str],
-            run_script: TextIOBase = None,
-            grace_seconds: int = 30,
-        ) -> int:
-            """
-            Submit a new SLURM Job to process a flow run
-            """
+        # --parsable2 gives one field per line without a trailing delimiter.
+        # Take the first line (the job allocation itself, not any step records).
+        # sacct may return "CANCELLED by <uid>" so we check with startswith.
+        state = result.stdout.strip().split("\n")[0].strip().upper()
 
-            job = JobDefinition.from_kwargs(slurm_kwargs)
-            task_submit = self.api.submit(job, run_script)
-            res = await asyncio.wait_for(task_submit, timeout=grace_seconds)
-
-            if res.errors and len(res.errors) > 0:
-                raise RuntimeError(res.errors)
-
-            return res.job_id
-
-        async def status(self, jobid: int, grace_seconds: int = 30) -> SlurmJobStatus:
-            """
-            Query the status of a SLURM job by jobid
-            """
-
-            task_status = self.api.status(jobid)
-            res = await asyncio.wait_for(task_status, timeout=grace_seconds)
-
-            if len(res.errors) > 0 or len(res.jobs) != 1:
-                return SlurmJobStatus.UNKNOWN
-
-            return SlurmJobStatus[res.jobs[0].job_state]
-
-        async def kill(self, jobid: int, grace_seconds: int = 30):
-            """
-            Cancel the job with jobid
-            """
-
-            task_cancel = self.api.cancel(jobid)
-            await asyncio.wait_for(task_cancel, timeout=grace_seconds)
+        if state.startswith("CANCELLED"):
+            return SlurmJobStatus.CANCELLED
+        if state in ("TIMEOUT", "NODE_FAIL", "OUT_OF_MEMORY"):
+            return SlurmJobStatus.FAILED
+        try:
+            return SlurmJobStatus[state]
+        except KeyError:
+            return SlurmJobStatus.UNKNOWN

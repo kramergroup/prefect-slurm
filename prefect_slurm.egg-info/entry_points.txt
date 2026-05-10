@@ -1,2 +1,0 @@
-[prefect.collections]
-prefect_slurm = prefect_slurm

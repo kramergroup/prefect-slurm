@@ -1,0 +1,91 @@
+{
+  "job_configuration": {
+    "hpc_system": "CHANGE_ME",
+    "image": "{{ image }}",
+    "working_dir": "{{ working_dir }}",
+    "connection_name": null,
+    "queue": "{{ queue }}",
+    "num_nodes": "{{ num_nodes }}",
+    "num_processes_per_node": "{{ num_processes_per_node }}",
+    "max_walltime": "{{ max_walltime }}",
+    "pre_command": "{{ pre_command }}",
+    "post_command": "{{ post_command }}",
+    "script_template": [
+      "#!/bin/bash",
+      "#SBATCH --mail-type=FAIL,TIME_LIMIT_90  ### possible values (NONE, BEGIN, END, FAIL, REQUEUE, ALL)",
+      "ssh -D 9000 10.10.100.1 -fN",
+      "/beegfs/home/k/kramerd/bin/proxymux -l 0.0.0.0:8087 -d socks5://localhost:9000 &",
+      "sleep 1",
+      "echo \"Proxy started\"",
+      "export https_proxy=http://localhost:8087 http_proxy=http://localhost:8087",
+      "export HTTPS_PROXY=http://localhost:8087 HTTP_PROXY=http://localhost:8087",
+      "source ~/.bashrc",
+      "{%if pre_command is defined and pre_command != None and pre_command != '' %}",
+      "echo \"Running pre-command [{{ pre_command }}]\"",
+      "{{ pre_command }}",
+      "{% endif %}",
+      "echo \"Starting prefect\"",
+      "mkdir ${PREFECT__FLOW_RUN_ID}",
+      "cd ${PREFECT__FLOW_RUN_ID}",
+      "{% if image is defined and image != None and image != '' %}",
+      "srun singularity run --bind $(pwd):/run --pwd /run docker://{{ image }}",
+      "{% else %}",
+      "prefect flow-run execute",
+      "{% endif %}",
+      "{%if post_command is defined and post_command != None and post_command != '' %}",
+      "echo \"Running post-command [{{ post_command }}]\"",
+      "{{ post_command }}",
+      "{% endif %}"
+    ]
+  },
+  "variables": {
+    "type": "object",
+    "properties": {
+      "working_dir": {
+        "title": "Working directory",
+        "description": "Working directory for the job",
+        "default": "/ceph/scratch/prefect",
+        "type": "string"
+      },
+      "image": {
+        "title": "docker image",
+        "description": "The docker image containing the flow code",
+        "type": "string"
+      },
+      "pre_command": {
+        "title": "pre-run command",
+        "description": "Shell command executed before flow run (e.g., to initiate environments)",
+        "type": "string"
+      },
+      "post_command": {
+        "title": "post-run command",
+        "description": "Shell command executed after flow run (e.g., to clean-up environments)",
+        "type": "string"
+      },
+      "num_nodes": {
+        "title": "number of compute nodes",
+        "description": "The number of nodes to be allocated per flow run",
+        "default": 1,
+        "type": "integer"
+      },
+      "num_processes_per_node": {
+        "title": "number of processes per node",
+        "description": "number of MPI processes per node. Usually equal to the number of CPUs per node.",
+        "default": 72,
+        "type": "integer"
+      },
+      "max_walltime": {
+        "title": "maximum walltime",
+        "description": "The maximum walltime allocated to a flow run. Set sensibly, this can help starting SLURM jobs with higher priority.",
+        "default": "00:05:00",
+        "type": "string"
+      },
+      "queue": {
+        "title": "SLURM queue",
+        "description": "The SLURM partition to send jobs to. Depending on the cluster configutation, this has implications on priority, walltime, execution node types, etc.",
+        "default": "dev",
+        "type": "string"
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+prefect
+prefect_aws
+httpx[socks]

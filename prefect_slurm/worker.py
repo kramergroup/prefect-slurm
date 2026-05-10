@@ -9,11 +9,13 @@ TODO:
 
 import asyncio
 import sys
+from io import StringIO
 from pathlib import Path
 from typing import Optional
 
 import anyio.abc
-from prefect.blocks.system import Secret
+from jinja2 import Template
+from prefect.blocks.core import Block
 from prefect.client.schemas import FlowRun
 from prefect.server.schemas.core import Flow
 from prefect.server.schemas.responses import DeploymentResponse
@@ -24,10 +26,69 @@ from prefect.workers.base import (
     BaseWorker,
     BaseWorkerResult,
 )
-from pydantic import Field, HttpUrl, validator
+from pydantic import Field, HttpUrl, SecretStr, field_validator
 
 from prefect_slurm.api.jobs import JobDefinition
-from prefect_slurm.slurm import APIBasedSlurmBackend, SlurmJobStatus
+from prefect_slurm.slurm import (
+    APIBasedSlurmBackend,
+    CLIBasedSlurmBackend,
+    SlurmBackend,
+    SlurmJobStatus,
+)
+
+
+class SlurmAPIConnection(Block):
+    """
+    SlurmAPIConnection defines a SLURM API endpoint.
+    """
+
+    username: str = Field(
+        title="Username", description="The name of  the user interacting with SLURM"
+    )
+
+    auth_token: SecretStr = Field(
+        title="Token secret name",
+        description="The name of the secret holding the API authenication token",
+    )
+
+    endpoint: HttpUrl = Field(
+        title="SLURM API Endpoint URL", description="The URL of the SLURM API endpoint"
+    )
+
+    insecure: bool = Field(
+        default=False,
+        title="Insecure connection",
+        description="Allow insecure connection with SLURM API",
+    )
+
+    _logo_url = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Slurm_logo.svg"
+    _description = "Configures an API endpoint for a SLURM cluster"
+
+
+class SlurmSSHConnection(Block):
+    """
+    SlurmSSHConnection defined a ssh connection for the slurm cluster.
+    """
+
+    host: str = Field(
+        title="SSH hostname",
+        description="DNS name or IP of the login node",
+    )
+
+    username: str = Field(
+        title="Username", description="The name of  the user interacting with SLURM"
+    )
+
+    password: SecretStr = Field(
+        title="Password", description="The password of the user interacting with SLURM"
+    )
+
+    port: int = Field(
+        default=22, title="Port", description="The SSH port to contact the cluster on"
+    )
+
+    _logo_url = "https://upload.wikimedia.org/wikipedia/commons/3/3a/Slurm_logo.svg"
+    _description = "Configures a ssh connection for a SLURM cluster"
 
 
 class SlurmJobConfiguration(BaseJobConfiguration):
@@ -45,36 +106,44 @@ class SlurmJobConfiguration(BaseJobConfiguration):
     """
 
     stream_output: bool = Field(default=True)
-    working_dir: Optional[Path] = Field(default=None)
+
+    working_dir: Optional[Path] = Field(
+        default=None,
+        title="Working directory",
+        description="Working directory for the job",
+    )
 
     num_nodes: int = Field(default=1)
     num_processes_per_node: int = Field(default=72)
     max_walltime: str = Field(
-        default="24:00:00", regex="^[0-9]{1,9}:[0-5][0-9]:[0-5][0-9]"
+        default="24:00:00", pattern="^[0-9]{1,9}:[0-5][0-9]:[0-5][0-9]"
     )
 
-    slurm_queue: str = Field(
+    queue: str = Field(
         default="small",
         title="Slurm Queue",
         description="The Slurm queue jobs are submitted to.",
     )
 
-    slurm_user: str = Field(
-        default="username",
-        title="Username",
-        description="The username used to authenticate with the slurm API.",
+    connection_name: Optional[str] = Field(
+        default=None,
+        title="Slurm connection",
+        description="""
+            The connection block name to access the SLURM manager. This can either
+            be a API endpoint or a SSH connection. When omitted, the worker derives
+            the name from hpc_system and the authenticated user identity.
+        """,
     )
 
-    slurm_token: Secret = Field(
+    hpc_system: Optional[str] = Field(
         default=None,
-        title="API Token",
-        description="The bearer token to authenticate with the Slurm API.",
-    )
-
-    slurm_url: HttpUrl = Field(
-        default=None,
-        title="API URL",
-        description="URL of the Slurm API endpoint.",
+        title="HPC system name",
+        description=(
+            "Short identifier for the HPC system (e.g. 'issy'). Set once as a "
+            "literal in the work pool's base-job-template.json — not in variables. "
+            "Used to derive the connection block name as "
+            "'slurm-{hpc_system}-{submitter}' when connection_name is not set."
+        ),
     )
 
     update_interval_sec: int = Field(
@@ -83,13 +152,65 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         description="Interval in seconds to poll the API for job updates",
     )
 
-    @validator("working_dir")
-    def validate_command(cls, v):
+    script_template: Optional[str] = Field(
+        default=None,
+        title="Submit script template",
+        description=""""
+            Allows to provide a template for generating submit scripts. If provided,
+            a custom submit script is generated. This allows to tweak the
+            execution environment.
+        """,
+    )
+
+    image: Optional[str] = Field(
+        default=None,
+        title="Docker image",
+        description="The name of a docker image for packaging the code",
+    )
+
+    pre_command: Optional[str] = Field(
+        default=None,
+        title="Pre-run command",
+        description="""
+            A shell command to execute before the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to initiate environments etc.
+        """,
+        examples=["conda activate prefect", "conda create -n mytempenv"],
+    )
+
+    post_command: Optional[str] = Field(
+        default=None,
+        title="Post-run command",
+        description="""
+            A shell command to execute after the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to clean-up environments etc.
+        """,
+        examples=["conda remove mytempenv"],
+    )
+
+    @field_validator("working_dir")
+    @classmethod
+    def validate_working_directory(cls, v):
         """
         Make sure that the working directory is formatted for the current platform.
         """
         if v:
             return relative_path_to_current_platform(v)
+        return v
+
+    @field_validator("script_template", mode="before")
+    @classmethod
+    def ensure_script_template_is_string(cls, v):
+        """
+        Ensures that the script template is a single string with newline
+        characters if needed.
+        """
+
+        if type(v) == list:
+            return "\n".join(v)
+
         return v
 
     def prepare_for_flow_run(
@@ -166,28 +287,57 @@ class SlurmVariables(BaseVariables):
         description="Interval in seconds to poll the API for job updates",
     )
 
-    slurm_user: str = Field(
-        default="username",
-        title="Username",
-        description="The username used to authenticate with the slurm API.",
-    )
-
-    slurm_token: Secret = Field(
-        default=None,
-        title="API Token",
-        description="The bearer token to authenticate with the Slurm API.",
-    )
-
-    slurm_url: HttpUrl = Field(
-        default=None,
-        title="API URL",
-        description="URL of the Slurm API endpoint.",
-    )
-
-    slurm_queue: str = Field(
+    queue: str = Field(
         default="small",
         title="Slurm Queue",
         description="The Slurm queue jobs are submitted to.",
+    )
+
+    connection_name: Optional[str] = Field(
+        default=None,
+        title="Slurm connection",
+        description="""
+            The name of a connection block to access the SLURM manager. This can either
+            be a API endpoint or a SSH connection. When omitted, the worker derives
+            the name from hpc_system and the authenticated user identity.
+        """,
+    )
+
+    script_template: Optional[str] = Field(
+        default=None,
+        title="Submit script template",
+        description="""
+            Allows to provide a template for generating submit scripts. If provided,
+            a custom submit script is generated. This allows to tweak the
+            execution environment.
+        """,
+    )
+
+    image: Optional[str] = Field(
+        title="Docker image",
+        description="The name of a docker image for packaging the code",
+    )
+
+    pre_command: Optional[str] = Field(
+        default=None,
+        title="Pre-run command",
+        description="""
+            A shell command to execute before the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to initiate environments etc.
+        """,
+        examples=["conda activate prefect", "conda create -n mytempenv"],
+    )
+
+    post_command: Optional[str] = Field(
+        default=None,
+        title="Post-run command",
+        description="""
+            A shell command to execute after the flow is executed. This is
+            provided as an environment variable to the script_template and
+            can be used to clean-up environments etc.
+        """,
+        examples=["conda remove mytempenv"],
     )
 
 
@@ -231,18 +381,15 @@ class SlurmWorker(BaseWorker):
 
         flow_run_logger = self.get_flow_run_logger(flow_run)
 
-        backend = APIBasedSlurmBackend(
-            endpoint=configuration.slurm_url,
-            username=configuration.slurm_user,
-            token=configuration.slurm_token.get(),
-        )
+        connection_name = self._resolve_connection_name(configuration, flow_run)
+        backend = await self._create_backend_from_name(connection_name)
 
         env = configuration._base_environment()
         env.update(configuration.env)
 
         script = self._submit_script(configuration)
         job_def = JobDefinition(
-            partition=configuration.slurm_queue,
+            partition=configuration.queue,
             time_limit=configuration.max_walltime,
             tasks=configuration.num_processes_per_node * configuration.num_nodes,
             nodes=configuration.num_nodes,
@@ -251,21 +398,23 @@ class SlurmWorker(BaseWorker):
             name=f"prefect-{flow_run.id}",
         )
 
-        slurm_job_id = await backend.submit(job_def, script)
+        slurm_job_id = await backend.submit(job_def, StringIO(script))
 
         flow_run_logger.info(
-            f"Submitted job '{job_def.name}' to {configuration.name} "
-            f"using account {configuration.slurm_user} with "
+            f"Submitted job '{job_def.name}' for run '{configuration.name}' "
+            f"using connection {connection_name}; "
             f"slurm job id {slurm_job_id}."
         )
 
         if task_status:
             # Use a unique ID to mark the run as started. This ID is later used to
             # tear down infrastructure if the flow run is cancelled.
-            task_status.started(slurm_job_id)
+            task_status.started(f"{slurm_job_id}@{connection_name}")
 
         # Monitor the execution
-        job_status = await self._watch_job(slurm_job_id, configuration)
+        job_status = await self._watch_job(
+            slurm_job_id, connection_name, configuration.update_interval_sec
+        )
         exit_code = 0 if job_status == SlurmJobStatus.COMPLETED else -1
 
         flow_run_logger.info(
@@ -285,13 +434,11 @@ class SlurmWorker(BaseWorker):
         identified by the infrastructure_pid parameter.
         """
 
-        backend = APIBasedSlurmBackend(
-            endpoint=configuration.slurm_url,
-            username=configuration.slurm_user,
-            token=configuration.slurm_token,
+        job_id, conn_name = self._parse_infrastructure_pid(
+            infrastructure_pid, fallback_connection=configuration.connection_name
         )
-
-        await backend.kill(infrastructure_pid, grace_seconds=grace_seconds)
+        backend = await self._create_backend_from_name(conn_name)
+        await backend.kill(job_id, grace_seconds=grace_seconds)
         return
 
     @staticmethod
@@ -299,21 +446,95 @@ class SlurmWorker(BaseWorker):
         """
         Generate a command for a flow run job.
         """
+
         return "python -m prefect.engine"
 
+    def _resolve_connection_name(
+        self,
+        configuration: SlurmJobConfiguration,
+        flow_run: FlowRun,
+    ) -> str:
+        """Return the connection block name to use for this flow run.
+
+        Explicit connection_name always wins. Otherwise derives the name
+        from hpc_system and the authenticated user identity supplied by
+        the reverse proxy via flow_run.created_by.display_value.
+        """
+        if configuration.connection_name:
+            return configuration.connection_name
+        if (
+            configuration.hpc_system
+            and flow_run.created_by
+            and flow_run.created_by.display_value
+        ):
+            return (
+                f"slurm-{configuration.hpc_system}-{flow_run.created_by.display_value}"
+            )
+        raise AttributeError(
+            "Cannot determine SLURM connection: set 'connection_name' explicitly, "
+            "or set 'hpc_system' and ensure the reverse proxy injects user identity "
+            "via X-Remote-User (or configured PREFECT_SERVER_USER_HEADER)."
+        )
+
+    @staticmethod
+    def _parse_infrastructure_pid(
+        infrastructure_pid: str,
+        fallback_connection: Optional[str] = None,
+    ):
+        """Parse infrastructure_pid into (job_id, connection_name).
+
+        New format: "{job_id}@{connection_name}" — written by run().
+        Old format: "{job_id}" — written before this feature existed;
+                    fallback_connection is used (from configuration.connection_name).
+        """
+        if "@" in infrastructure_pid:
+            job_id, conn_name = infrastructure_pid.split("@", 1)
+            return job_id, conn_name
+        if fallback_connection:
+            return infrastructure_pid, fallback_connection
+        raise AttributeError(
+            "Cannot determine SLURM connection from infrastructure_pid "
+            f"'{infrastructure_pid}': no '@' separator and no fallback connection set."
+        )
+
+    async def _create_backend_from_name(self, connection_name: str) -> SlurmBackend:
+        """Load the connection block identified by connection_name and return
+        the appropriate backend (API or SSH)."""
+        try:
+            connection_block = await SlurmAPIConnection.load(connection_name)
+            return APIBasedSlurmBackend(
+                endpoint=connection_block.endpoint,
+                username=connection_block.username,
+                token=connection_block.auth_token,
+                insecure=connection_block.insecure,
+            )
+        except ValueError:
+            try:
+                connection_block = await SlurmSSHConnection.load(connection_name)
+                return CLIBasedSlurmBackend(
+                    host=connection_block.host,
+                    username=connection_block.username,
+                    password=connection_block.password,
+                )
+            except ValueError:
+                raise AttributeError(
+                    f"No valid connection block found for '{connection_name}'. "
+                    "Create a SlurmAPIConnection or SlurmSSHConnection block "
+                    "with that name."
+                )
+
     async def _watch_job(
-        self, job_id: int, configuration: SlurmJobConfiguration
+        self,
+        job_id: int,
+        connection_name: str,
+        update_interval_sec: int = 30,
     ) -> SlurmJobStatus:
         """
         Watch a running slurm job by periodically polling the
         API for the job status.
         """
 
-        backend = APIBasedSlurmBackend(
-            endpoint=configuration.slurm_url,
-            username=configuration.slurm_user,
-            token=configuration.slurm_token.get(),
-        )
+        backend = await self._create_backend_from_name(connection_name)
 
         status = None
 
@@ -325,7 +546,7 @@ class SlurmWorker(BaseWorker):
             SlurmJobStatus.CONFIGURING,
         ]:
             status = await backend.status(job_id)
-            await asyncio.sleep(configuration.update_interval_sec)
+            await asyncio.sleep(update_interval_sec)
 
         return status
 
@@ -333,9 +554,44 @@ class SlurmWorker(BaseWorker):
         """
         Generate the submit script for the slurm job
         """
-        script = ["#!/bin/bash"]
 
-        command = configuration.command or self._base_flow_run_command()
-        script += [command]
+        try:
 
-        return "\n".join(script)
+            return self._submit_script_from_template(configuration)
+
+        except ValueError:
+
+            script = ["#!/bin/bash"]
+
+            command = configuration.command or self._base_flow_run_command()
+            script += [command]
+
+            return "\n".join(script)
+
+    def _submit_script_from_template(self, configuration: SlurmJobConfiguration) -> str:
+        """
+        Creates the submit script based on a provided template.
+        """
+
+        if configuration.script_template is None:
+            raise ValueError("Script template required")
+
+        template = Template(configuration.script_template)
+
+        return template.render(
+            working_dir=configuration.working_dir,
+            num_nodes=configuration.num_nodes,
+            num_processes_per_node=configuration.num_processes_per_node,
+            max_walltime=configuration.max_walltime,
+            queue=configuration.queue,
+            image=configuration.image,
+            pre_command=configuration.pre_command,
+            post_command=configuration.post_command,
+        )
+
+
+if __name__ == "__main__":
+
+    from prefect.cli.worker import start
+
+    start(worker_name="debug", work_pool_name="hsuper-test", worker_type="slurm")

@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dependencies = [
+    "prefect>=3.1.1",
+    "asyncio>=3.4.3",
+    "asyncssh>=2.19.0",
+]
+name = "prefect-slurm"
+description = "Prefect integrations for interacting with SLURM workload manager."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache License 2.0" }
+keywords = ["prefect"]
+authors = [{ name = "Helmut-Schmidt-University" }]
+classifiers = [
+    "Natural Language :: English",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+  "versioneer"
+]
+
+[project.urls]
+Homepage = "https://github.com/kramergroup/prefect-slurm"
+
+[project.entry-points."prefect.collections"]
+prefect_slurm = "prefect_slurm"
+
+[tool.setuptools_scm]
+version_file = "prefect_slurm/_version.py"
+root = "../../.."
+tag_regex = "^prefect-slurm-(?P<version>\\d+\\.\\d+\\.\\d+(?:[a-zA-Z0-9]+(?:\\.[a-zA-Z0-9]+)*)?)$"
+fallback_version = "0.0.0"
+git_describe_command = 'git describe --dirty --tags --long --match "prefect-slurm-*[0-9]*"'
+
+[tool.isort]
+profile = 'black'
+
+[tool.interrogate]
+ignore-init-module = true
+ignore_init_method = true
+exclude = ["prefect_slurm/_version.py", "tests"]
+fail-under = 95
+omit-covered-files = true
+
+[tool.coverage.run]
+omit = ["tests/*", "prefect_slurm/_version.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "session"
+asyncio_mode = "auto"
+env = ["PREFECT_TEST_MODE=1"]
+timeout = 30
