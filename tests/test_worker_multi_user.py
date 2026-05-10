@@ -152,3 +152,37 @@ def test_parse_pid_connection_name_with_at_symbol(worker):
     job_id, conn = worker._parse_infrastructure_pid("99@slurm-hawk-user@domain")
     assert job_id == "99"
     assert conn == "slurm-hawk-user@domain"
+
+
+# ---------------------------------------------------------------------------
+# Task 5: _create_backend_from_name
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_backend_from_name_returns_api_backend(worker):
+    with patch.object(
+        SlurmAPIConnection, "load", new=AsyncMock(return_value=mock_api_block())
+    ):
+        backend = await worker._create_backend_from_name("slurm-issy-jsmith")
+    assert isinstance(backend, APIBasedSlurmBackend)
+
+
+@pytest.mark.asyncio
+async def test_create_backend_from_name_falls_back_to_ssh(worker):
+    with patch.object(
+        SlurmAPIConnection, "load", new=AsyncMock(side_effect=ValueError)
+    ), patch.object(
+        SlurmSSHConnection, "load", new=AsyncMock(return_value=mock_ssh_block())
+    ):
+        backend = await worker._create_backend_from_name("slurm-issy-jsmith")
+    assert isinstance(backend, CLIBasedSlurmBackend)
+
+
+@pytest.mark.asyncio
+async def test_create_backend_from_name_raises_when_neither_block_found(worker):
+    with patch.object(
+        SlurmAPIConnection, "load", new=AsyncMock(side_effect=ValueError)
+    ), patch.object(SlurmSSHConnection, "load", new=AsyncMock(side_effect=ValueError)):
+        with pytest.raises(AttributeError, match="No valid connection"):
+            await worker._create_backend_from_name("slurm-issy-jsmith")

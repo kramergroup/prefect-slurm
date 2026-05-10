@@ -492,20 +492,12 @@ class SlurmWorker(BaseWorker):
             f"'{infrastructure_pid}': no '@' separator and no fallback connection set."
         )
 
-    async def _create_backend(
-        self, configuration: SlurmJobConfiguration
-    ) -> SlurmBackend:
-        """
-        Creates a backend to communicate with the SLURM workload manager
-        Based on the provided configuration, either an API or an SSH backend
-        is returned
-        """
-
+    async def _create_backend_from_name(self, connection_name: str) -> SlurmBackend:
+        """Load the connection block identified by connection_name and return
+        the appropriate backend (API or SSH)."""
         try:
-            connection_block = await SlurmAPIConnection.load(
-                configuration.connection_name
-            )
-            backend = APIBasedSlurmBackend(
+            connection_block = await SlurmAPIConnection.load(connection_name)
+            return APIBasedSlurmBackend(
                 endpoint=connection_block.endpoint,
                 username=connection_block.username,
                 token=connection_block.auth_token,
@@ -513,20 +505,18 @@ class SlurmWorker(BaseWorker):
             )
         except ValueError:
             try:
-                connection_block = await SlurmSSHConnection.load(
-                    configuration.connection_name
-                )
-                backend = CLIBasedSlurmBackend(
+                connection_block = await SlurmSSHConnection.load(connection_name)
+                return CLIBasedSlurmBackend(
                     host=connection_block.host,
                     username=connection_block.username,
                     password=connection_block.password,
                 )
             except ValueError:
                 raise AttributeError(
-                    "No valid connection defined to access SLURM manager"
+                    f"No valid connection block found for '{connection_name}'. "
+                    "Create a SlurmAPIConnection or SlurmSSHConnection block "
+                    "with that name."
                 )
-
-        return backend
 
     async def _watch_job(
         self, job_id: int, configuration: SlurmJobConfiguration
