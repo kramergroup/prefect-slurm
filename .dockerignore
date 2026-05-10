@@ -1,0 +1,11 @@
+.git
+.claude
+.mypy_cache
+__pycache__
+*.egg-info
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+tests
+docs

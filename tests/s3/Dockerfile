@@ -1,17 +1,15 @@
-FROM python:3.12
+FROM python:3.14.4-slim
 
 COPY ./requirements.txt /src/requirements.txt
 COPY flow.py /src/
 
-# This is needed because singularity does not respect the WORKDIR directive
-# and executes in a mounted home directory by default.
-# You also need to set the entrypoint_type to EntrypointType.MODULE_PATH in
-# deploy, so prefect is looking for the test_flow function in the test_flow module
+# Singularity does not respect WORKDIR and executes in a mounted home directory
+# by default. EntrypointType.MODULE_PATH must also be set in deploy.
 ENV PYTHONPATH=/src:${PYTHONPATH}
 
-RUN pip install -r /src/requirements.txt
+RUN pip install --no-cache-dir -r /src/requirements.txt
 
-ENV PREFECT_DEBUG_MODE=1
+ARG DEBUG=1
+ENV PREFECT_DEBUG_MODE=$DEBUG
 
-# CMD [ "prefect", "flow-run", "execute" ]
 CMD [ "prefect", "flow-run", "execute" ]

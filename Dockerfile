@@ -1,8 +1,9 @@
-FROM prefecthq/prefect:3.1.12-python3.11
+FROM prefecthq/prefect:3.7.0-python3.14
+
+WORKDIR /app
 
 COPY . /src/
-# RUN python -m pip install -r /src/requirements.txt
-RUN python -m pip install /src
+RUN python -m pip install --no-cache-dir /src
 
-WORKDIR /
-
+RUN useradd -m prefect
+USER prefect
