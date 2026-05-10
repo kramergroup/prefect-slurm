@@ -1,8 +1,9 @@
 {
   "job_configuration": {
+    "hpc_system": "CHANGE_ME",
     "image": "{{ image }}",
     "working_dir": "{{ working_dir }}",
-    "connection_name": "hsuper-kramerd",
+    "connection_name": null,
     "queue": "{{ queue }}",
     "num_nodes": "{{ num_nodes }}",
     "num_processes_per_node": "{{ num_processes_per_node }}",
