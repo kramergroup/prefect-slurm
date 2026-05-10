@@ -148,7 +148,7 @@ def test_parse_pid_old_format_no_fallback_raises(worker):
 
 
 def test_parse_pid_connection_name_with_at_symbol(worker):
-    """Connection names won't contain @, but rsplit handles edge cases."""
+    """split on first @ keeps any @ in the connection name intact."""
     job_id, conn = worker._parse_infrastructure_pid("99@slurm-hawk-user@domain")
     assert job_id == "99"
     assert conn == "slurm-hawk-user@domain"
