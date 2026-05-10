@@ -444,6 +444,33 @@ class SlurmWorker(BaseWorker):
 
         return "python -m prefect.engine"
 
+    def _resolve_connection_name(
+        self,
+        configuration: SlurmJobConfiguration,
+        flow_run: FlowRun,
+    ) -> str:
+        """Return the connection block name to use for this flow run.
+
+        Explicit connection_name always wins. Otherwise derives the name
+        from hpc_system and the authenticated user identity supplied by
+        the reverse proxy via flow_run.created_by.display_value.
+        """
+        if configuration.connection_name:
+            return configuration.connection_name
+        if (
+            configuration.hpc_system
+            and flow_run.created_by
+            and flow_run.created_by.display_value
+        ):
+            return (
+                f"slurm-{configuration.hpc_system}-{flow_run.created_by.display_value}"
+            )
+        raise AttributeError(
+            "Cannot determine SLURM connection: set 'connection_name' explicitly, "
+            "or set 'hpc_system' and ensure the reverse proxy injects user identity "
+            "via X-Remote-User (or configured PREFECT_SERVER_USER_HEADER)."
+        )
+
     async def _create_backend(
         self, configuration: SlurmJobConfiguration
     ) -> SlurmBackend:

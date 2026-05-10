@@ -83,3 +83,41 @@ def test_hpc_system_can_be_set():
     """hpc_system accepts a string value."""
     cfg = SlurmJobConfiguration(name="t", command="echo hi", hpc_system="issy")
     assert cfg.hpc_system == "issy"
+
+
+# ---------------------------------------------------------------------------
+# Task 3: _resolve_connection_name
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_uses_explicit_connection_name(worker):
+    cfg = make_config(connection_name="my-explicit-block", hpc_system="issy")
+    flow_run = make_flow_run(display_value="jsmith")
+    assert worker._resolve_connection_name(cfg, flow_run) == "my-explicit-block"
+
+
+def test_resolve_derives_name_from_hpc_system_and_identity(worker):
+    cfg = make_config(connection_name=None, hpc_system="issy")
+    flow_run = make_flow_run(display_value="jsmith")
+    assert worker._resolve_connection_name(cfg, flow_run) == "slurm-issy-jsmith"
+
+
+def test_resolve_raises_when_no_identity(worker):
+    cfg = make_config(connection_name=None, hpc_system="issy")
+    flow_run = make_flow_run(display_value=None)
+    with pytest.raises(AttributeError, match="Cannot determine SLURM connection"):
+        worker._resolve_connection_name(cfg, flow_run)
+
+
+def test_resolve_raises_when_no_hpc_system_and_no_connection_name(worker):
+    cfg = make_config(connection_name=None, hpc_system=None)
+    flow_run = make_flow_run(display_value="jsmith")
+    with pytest.raises(AttributeError, match="Cannot determine SLURM connection"):
+        worker._resolve_connection_name(cfg, flow_run)
+
+
+def test_resolve_raises_when_created_by_is_none(worker):
+    cfg = make_config(connection_name=None, hpc_system="issy")
+    flow_run = make_flow_run()  # no created_by at all
+    with pytest.raises(AttributeError, match="Cannot determine SLURM connection"):
+        worker._resolve_connection_name(cfg, flow_run)
