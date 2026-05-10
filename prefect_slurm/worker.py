@@ -293,11 +293,13 @@ class SlurmVariables(BaseVariables):
         description="The Slurm queue jobs are submitted to.",
     )
 
-    connection_name: str = Field(
+    connection_name: Optional[str] = Field(
+        default=None,
         title="Slurm connection",
         description="""
             The name of a connection block to access the SLURM manager. This can either
-            be a API endpoint or a SSH connection.
+            be a API endpoint or a SSH connection. When omitted, the worker derives
+            the name from hpc_system and the authenticated user identity.
         """,
     )
 
