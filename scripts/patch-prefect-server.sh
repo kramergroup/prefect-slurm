@@ -61,7 +61,7 @@ DEPS_FILE="${SRC_DIR}src/prefect/server/api/dependencies.py"
 [[ -f "$DEPS_FILE" ]] || { echo "ERROR: dependencies.py not found at $DEPS_FILE"; exit 1; }
 
 echo "==> Applying patch..."
-patch --forward -p1 -d "$SRC_DIR" < "$PATCH_FILE" \
+patch --forward "$DEPS_FILE" < "$PATCH_FILE" \
     || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
 
 FULL_TAG="${REGISTRY}/${IMAGE_NAME}:${VERSION}-patched"
