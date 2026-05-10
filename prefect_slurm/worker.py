@@ -381,7 +381,8 @@ class SlurmWorker(BaseWorker):
 
         flow_run_logger = self.get_flow_run_logger(flow_run)
 
-        backend = await self._create_backend(configuration)
+        connection_name = self._resolve_connection_name(configuration, flow_run)
+        backend = await self._create_backend_from_name(connection_name)
 
         env = configuration._base_environment()
         env.update(configuration.env)
@@ -401,17 +402,19 @@ class SlurmWorker(BaseWorker):
 
         flow_run_logger.info(
             f"Submitted job '{job_def.name}' for run '{configuration.name}' "
-            f"using connection {configuration.connection_name}; "
+            f"using connection {connection_name}; "
             f"slurm job id {slurm_job_id}."
         )
 
         if task_status:
             # Use a unique ID to mark the run as started. This ID is later used to
             # tear down infrastructure if the flow run is cancelled.
-            task_status.started(slurm_job_id)
+            task_status.started(f"{slurm_job_id}@{connection_name}")
 
         # Monitor the execution
-        job_status = await self._watch_job(slurm_job_id, configuration)
+        job_status = await self._watch_job(
+            slurm_job_id, connection_name, configuration.update_interval_sec
+        )
         exit_code = 0 if job_status == SlurmJobStatus.COMPLETED else -1
 
         flow_run_logger.info(
@@ -431,9 +434,11 @@ class SlurmWorker(BaseWorker):
         identified by the infrastructure_pid parameter.
         """
 
-        backend = await self._create_backend(configuration)
-
-        await backend.kill(infrastructure_pid, grace_seconds=grace_seconds)
+        job_id, conn_name = self._parse_infrastructure_pid(
+            infrastructure_pid, fallback_connection=configuration.connection_name
+        )
+        backend = await self._create_backend_from_name(conn_name)
+        await backend.kill(job_id, grace_seconds=grace_seconds)
         return
 
     @staticmethod
@@ -519,14 +524,17 @@ class SlurmWorker(BaseWorker):
                 )
 
     async def _watch_job(
-        self, job_id: int, configuration: SlurmJobConfiguration
+        self,
+        job_id: int,
+        connection_name: str,
+        update_interval_sec: int = 30,
     ) -> SlurmJobStatus:
         """
         Watch a running slurm job by periodically polling the
         API for the job status.
         """
 
-        backend = await self._create_backend(configuration)
+        backend = await self._create_backend_from_name(connection_name)
 
         status = None
 
@@ -538,7 +546,7 @@ class SlurmWorker(BaseWorker):
             SlurmJobStatus.CONFIGURING,
         ]:
             status = await backend.status(job_id)
-            await asyncio.sleep(configuration.update_interval_sec)
+            await asyncio.sleep(update_interval_sec)
 
         return status
 
