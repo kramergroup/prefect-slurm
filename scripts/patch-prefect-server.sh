@@ -43,21 +43,26 @@ done
 [[ -z "$REGISTRY" ]] && { echo "ERROR: --registry is required"; usage; }
 [[ -f "$PATCH_FILE" ]] || { echo "ERROR: patch file not found: $PATCH_FILE"; exit 1; }
 
+command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed or not in PATH"; exit 1; }
+
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
 echo "==> Downloading prefect==${VERSION} source..."
 pip download "prefect==${VERSION}" --no-deps --no-binary prefect -d "$WORKDIR" -q
-TARBALL="$(ls "$WORKDIR"/prefect-*.tar.gz | head -1)"
-[[ -z "$TARBALL" ]] && { echo "ERROR: source tarball not found in $WORKDIR"; exit 1; }
+TARBALLS=( "$WORKDIR"/prefect-*.tar.gz )
+[[ -f "${TARBALLS[0]}" ]] || { echo "ERROR: source tarball not found in $WORKDIR"; exit 1; }
+TARBALL="${TARBALLS[0]}"
 tar -xzf "$TARBALL" -C "$WORKDIR"
-SRC_DIR="$(ls -d "$WORKDIR"/prefect-*/)"
+SRC_DIRS=( "$WORKDIR"/prefect-*/ )
+SRC_DIR="${SRC_DIRS[0]}"
 
 DEPS_FILE="${SRC_DIR}src/prefect/server/api/dependencies.py"
 [[ -f "$DEPS_FILE" ]] || { echo "ERROR: dependencies.py not found at $DEPS_FILE"; exit 1; }
 
 echo "==> Applying patch..."
-patch --forward -p1 -d "$SRC_DIR" < "$PATCH_FILE"
+patch --forward -p1 -d "$SRC_DIR" < "$PATCH_FILE" \
+    || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
 
 FULL_TAG="${REGISTRY}/${IMAGE_NAME}:${VERSION}-patched"
 LATEST_TAG="${REGISTRY}/${IMAGE_NAME}:latest-patched"
