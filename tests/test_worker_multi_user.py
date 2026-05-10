@@ -60,3 +60,26 @@ def mock_ssh_block(username="jsmith"):
     block.username = username
     block.password = SecretStr("s3cr3t")
     return block
+
+
+# ---------------------------------------------------------------------------
+# Task 2: SlurmJobConfiguration field schema
+# ---------------------------------------------------------------------------
+
+
+def test_connection_name_is_optional():
+    """connection_name must accept None without raising a validation error."""
+    cfg = SlurmJobConfiguration(name="t", command="echo hi", connection_name=None)
+    assert cfg.connection_name is None
+
+
+def test_hpc_system_field_exists():
+    """hpc_system field must exist and default to None."""
+    cfg = SlurmJobConfiguration(name="t", command="echo hi", connection_name=None)
+    assert cfg.hpc_system is None
+
+
+def test_hpc_system_can_be_set():
+    """hpc_system accepts a string value."""
+    cfg = SlurmJobConfiguration(name="t", command="echo hi", hpc_system="issy")
+    assert cfg.hpc_system == "issy"

@@ -125,12 +125,25 @@ class SlurmJobConfiguration(BaseJobConfiguration):
         description="The Slurm queue jobs are submitted to.",
     )
 
-    connection_name: str = Field(
+    connection_name: Optional[str] = Field(
+        default=None,
         title="Slurm connection",
         description="""
             The connection block name to access the SLURM manager. This can either
-            be a API endpoint or a SSH connection.
+            be a API endpoint or a SSH connection. When omitted, the worker derives
+            the name from hpc_system and the authenticated user identity.
         """,
+    )
+
+    hpc_system: Optional[str] = Field(
+        default=None,
+        title="HPC system name",
+        description=(
+            "Short identifier for the HPC system (e.g. 'issy'). Set once as a "
+            "literal in the work pool's base-job-template.json — not in variables. "
+            "Used to derive the connection block name as "
+            "'slurm-{hpc_system}-{submitter}' when connection_name is not set."
+        ),
     )
 
     update_interval_sec: int = Field(
