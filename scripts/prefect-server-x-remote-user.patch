@@ -1,0 +1,48 @@
+--- /tmp/prefect-patch-work/dependencies.py.orig	2026-05-10 17:29:46
++++ /tmp/prefect-patch-work/dependencies.py.patched	2026-05-10 17:31:24
+@@ -3,6 +3,8 @@
+ """
+ 
+ import logging
++import os
++import re
+ from base64 import b64decode
+ from typing import Optional
+ from uuid import UUID
+@@ -14,7 +16,11 @@
+ from prefect.server import schemas
+ from prefect.settings import PREFECT_API_DEFAULT_LIMIT
+ 
++# Configurable user identity header injected by reverse proxy (nginx / Traefik)
++_USER_HEADER = os.getenv("PREFECT_SERVER_USER_HEADER", "x-remote-user").lower().replace("_", "-")
++_USER_HEADER_REGEX = os.getenv("PREFECT_SERVER_USER_HEADER_REGEX", "")
+ 
++
+ def provide_request_api_version(x_prefect_api_version: str = Header(None)):
+     if not x_prefect_api_version:
+         return
+@@ -125,6 +131,7 @@
+ 
+ 
+ def get_created_by(
++    request: Request,
+     prefect_automation_id: Optional[UUID] = Header(None, include_in_schema=False),
+     prefect_automation_name: Optional[str] = Header(None, include_in_schema=False),
+ ) -> Optional[schemas.core.CreatedBy]:
+@@ -143,6 +150,16 @@
+                 display_value=display_value,
+             )
+ 
++    raw = request.headers.get(_USER_HEADER)
++    if raw:
++        if _USER_HEADER_REGEX:
++            m = re.search(_USER_HEADER_REGEX, raw)
++            username = m.group(1) if m else None
++        else:
++            username = raw.strip()
++        if username:
++            return schemas.core.CreatedBy(type="USER", display_value=username)
++
+     return None
+ 
+ 
