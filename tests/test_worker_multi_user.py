@@ -121,3 +121,34 @@ def test_resolve_raises_when_created_by_is_none(worker):
     flow_run = make_flow_run()  # no created_by at all
     with pytest.raises(AttributeError, match="Cannot determine SLURM connection"):
         worker._resolve_connection_name(cfg, flow_run)
+
+
+# ---------------------------------------------------------------------------
+# Task 4: _parse_infrastructure_pid
+# ---------------------------------------------------------------------------
+
+
+def test_parse_pid_new_format(worker):
+    job_id, conn = worker._parse_infrastructure_pid("12345@slurm-issy-jsmith")
+    assert job_id == "12345"
+    assert conn == "slurm-issy-jsmith"
+
+
+def test_parse_pid_old_format_uses_fallback(worker):
+    job_id, conn = worker._parse_infrastructure_pid(
+        "12345", fallback_connection="slurm-old"
+    )
+    assert job_id == "12345"
+    assert conn == "slurm-old"
+
+
+def test_parse_pid_old_format_no_fallback_raises(worker):
+    with pytest.raises(AttributeError, match="Cannot determine SLURM connection"):
+        worker._parse_infrastructure_pid("12345")
+
+
+def test_parse_pid_connection_name_with_at_symbol(worker):
+    """Connection names won't contain @, but rsplit handles edge cases."""
+    job_id, conn = worker._parse_infrastructure_pid("99@slurm-hawk-user@domain")
+    assert job_id == "99"
+    assert conn == "slurm-hawk-user@domain"

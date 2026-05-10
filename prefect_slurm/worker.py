@@ -471,6 +471,27 @@ class SlurmWorker(BaseWorker):
             "via X-Remote-User (or configured PREFECT_SERVER_USER_HEADER)."
         )
 
+    @staticmethod
+    def _parse_infrastructure_pid(
+        infrastructure_pid: str,
+        fallback_connection: Optional[str] = None,
+    ):
+        """Parse infrastructure_pid into (job_id, connection_name).
+
+        New format: "{job_id}@{connection_name}" — written by run().
+        Old format: "{job_id}" — written before this feature existed;
+                    fallback_connection is used (from configuration.connection_name).
+        """
+        if "@" in infrastructure_pid:
+            job_id, conn_name = infrastructure_pid.split("@", 1)
+            return job_id, conn_name
+        if fallback_connection:
+            return infrastructure_pid, fallback_connection
+        raise AttributeError(
+            "Cannot determine SLURM connection from infrastructure_pid "
+            f"'{infrastructure_pid}': no '@' separator and no fallback connection set."
+        )
+
     async def _create_backend(
         self, configuration: SlurmJobConfiguration
     ) -> SlurmBackend:
