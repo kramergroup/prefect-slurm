@@ -19,6 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PATCH_FILE="${SCRIPT_DIR}/prefect-server-x-remote-user.patch"
 PATCH_FILE_2="${SCRIPT_DIR}/prefect-server-propagate-created-by.patch"
+PATCH_FILE_3="${SCRIPT_DIR}/prefect-server-propagate-created-by-deployments.patch"
 
 VERSION=""
 REGISTRY=""
@@ -44,6 +45,7 @@ done
 [[ -z "$REGISTRY" ]] && { echo "ERROR: --registry is required"; usage; }
 [[ -f "$PATCH_FILE"   ]] || { echo "ERROR: patch file not found: $PATCH_FILE";   exit 1; }
 [[ -f "$PATCH_FILE_2" ]] || { echo "ERROR: patch file not found: $PATCH_FILE_2"; exit 1; }
+[[ -f "$PATCH_FILE_3" ]] || { echo "ERROR: patch file not found: $PATCH_FILE_3"; exit 1; }
 
 BASE_IMAGE_VERSION="${VERSION}-python${PYTHON_VERSION:-3.14}-kubernetes"
 
@@ -63,15 +65,21 @@ SRC_DIR="${SRC_DIRS[0]}"
 
 DEPS_FILE="${SRC_DIR}src/prefect/server/api/dependencies.py"
 FLOW_RUNS_FILE="${SRC_DIR}src/prefect/server/api/flow_runs.py"
-[[ -f "$DEPS_FILE"      ]] || { echo "ERROR: dependencies.py not found at $DEPS_FILE";  exit 1; }
-[[ -f "$FLOW_RUNS_FILE" ]] || { echo "ERROR: flow_runs.py not found at $FLOW_RUNS_FILE"; exit 1; }
+DEPLOYMENTS_FILE="${SRC_DIR}src/prefect/server/api/deployments.py"
+[[ -f "$DEPS_FILE"        ]] || { echo "ERROR: dependencies.py not found at $DEPS_FILE";      exit 1; }
+[[ -f "$FLOW_RUNS_FILE"   ]] || { echo "ERROR: flow_runs.py not found at $FLOW_RUNS_FILE";    exit 1; }
+[[ -f "$DEPLOYMENTS_FILE" ]] || { echo "ERROR: deployments.py not found at $DEPLOYMENTS_FILE"; exit 1; }
 
 echo "==> Applying X-Remote-User identity patch..."
 patch --forward "$DEPS_FILE" < "$PATCH_FILE" \
     || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
 
-echo "==> Applying created_by propagation patch..."
+echo "==> Applying created_by propagation patch (flow_runs.py)..."
 patch --forward "$FLOW_RUNS_FILE" < "$PATCH_FILE_2" \
+    || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
+
+echo "==> Applying created_by propagation patch (deployments.py)..."
+patch --forward "$DEPLOYMENTS_FILE" < "$PATCH_FILE_3" \
     || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
 
 FULL_TAG="${REGISTRY}/${IMAGE_NAME}:${VERSION}-patched"
@@ -84,17 +92,20 @@ FROM prefecthq/prefect:${BASE_IMAGE_VERSION}
 # Replace patched server files
 COPY dependencies.py /tmp/patched_dependencies.py
 COPY flow_runs.py /tmp/patched_flow_runs.py
+COPY deployments.py /tmp/patched_deployments.py
 RUN SITE=\$(python -c "import prefect, os; print(os.path.dirname(prefect.__file__))") && \\
     cp /tmp/patched_dependencies.py "\${SITE}/server/api/dependencies.py" && \\
-    cp /tmp/patched_flow_runs.py    "\${SITE}/server/api/flow_runs.py"
+    cp /tmp/patched_flow_runs.py    "\${SITE}/server/api/flow_runs.py" && \\
+    cp /tmp/patched_deployments.py  "\${SITE}/server/api/deployments.py"
 
 # Runtime-configurable — override in your container environment
 ENV PREFECT_SERVER_USER_HEADER=x-remote-user
 ENV PREFECT_SERVER_USER_HEADER_REGEX=
 DOCKERFILE
 
-cp "$DEPS_FILE"      "$WORKDIR/dependencies.py"
-cp "$FLOW_RUNS_FILE" "$WORKDIR/flow_runs.py"
+cp "$DEPS_FILE"        "$WORKDIR/dependencies.py"
+cp "$FLOW_RUNS_FILE"   "$WORKDIR/flow_runs.py"
+cp "$DEPLOYMENTS_FILE" "$WORKDIR/deployments.py"
 
 echo "==> Building image ${FULL_TAG}..."
 docker build \
