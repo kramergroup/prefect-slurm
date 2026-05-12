@@ -1,0 +1,24 @@
+--- flow_runs.py.orig
++++ flow_runs.py.patched
+@@ -116,10 +116,21 @@
+         else:
+             work_queue_id = None
+
+         flow_run_object.work_queue_id = work_queue_id
+
++        if flow_run_object.created_by is None and flow_run.parent_task_run_id:
++            parent_task = await models.task_runs.read_task_run(
++                session=session, task_run_id=flow_run.parent_task_run_id
++            )
++            if parent_task and parent_task.flow_run_id:
++                parent_run = await models.flow_runs.read_flow_run(
++                    session=session, flow_run_id=parent_task.flow_run_id
++                )
++                if parent_run and parent_run.created_by:
++                    flow_run_object.created_by = parent_run.created_by
++
+         model = await models.flow_runs.create_flow_run(
+             session=session,
+             flow_run=flow_run_object,
+             orchestration_parameters=orchestration_parameters,
+         )
