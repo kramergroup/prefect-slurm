@@ -462,18 +462,17 @@ class SlurmWorker(BaseWorker):
         """
         if configuration.connection_name:
             return configuration.connection_name
-        if (
-            configuration.hpc_system
-            and flow_run.created_by
-            and flow_run.created_by.display_value
-        ):
-            return (
-                f"slurm-{configuration.hpc_system}-{flow_run.created_by.display_value}"
-            )
+        cb = flow_run.created_by
+        if configuration.hpc_system and cb and cb.type == "USER" and cb.display_value:
+            return f"slurm-{configuration.hpc_system}-{cb.display_value}"
         raise AttributeError(
             "Cannot determine SLURM connection: set 'connection_name' explicitly, "
             "or set 'hpc_system' and ensure the reverse proxy injects user identity "
-            "via X-Remote-User (or configured PREFECT_SERVER_USER_HEADER)."
+            "via X-Remote-User (or configured PREFECT_SERVER_USER_HEADER). "
+            f"[hpc_system={configuration.hpc_system!r}, "
+            f"created_by={cb!r}, "
+            f"type={cb.type if cb else None}, "
+            f"display_value={cb.display_value if cb else None}]"
         )
 
     @staticmethod

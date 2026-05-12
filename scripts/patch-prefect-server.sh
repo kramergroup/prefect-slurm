@@ -43,6 +43,8 @@ done
 [[ -z "$REGISTRY" ]] && { echo "ERROR: --registry is required"; usage; }
 [[ -f "$PATCH_FILE" ]] || { echo "ERROR: patch file not found: $PATCH_FILE"; exit 1; }
 
+BASE_IMAGE_VERSION="${VERSION}-python${PYTHON_VERSION:-3.14}-kubernetes"
+
 command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is not installed or not in PATH"; exit 1; }
 
 WORKDIR="$(mktemp -d)"
@@ -69,7 +71,7 @@ LATEST_TAG="${REGISTRY}/${IMAGE_NAME}:latest-patched"
 
 echo "==> Writing Dockerfile..."
 cat > "$WORKDIR/Dockerfile" <<DOCKERFILE
-FROM prefecthq/prefect:${VERSION}
+FROM prefecthq/prefect:${BASE_IMAGE_VERSION}
 
 # Replace dependencies.py with the patched version
 COPY dependencies.py /tmp/patched_dependencies.py
@@ -87,6 +89,7 @@ echo "==> Building image ${FULL_TAG}..."
 docker build \
     --tag "$FULL_TAG" \
     --tag "$LATEST_TAG" \
+    --platform linux/amd64 \
     "$WORKDIR"
 
 echo "==> Built: ${FULL_TAG}"

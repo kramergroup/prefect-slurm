@@ -123,6 +123,23 @@ def test_resolve_raises_when_created_by_is_none(worker):
         worker._resolve_connection_name(cfg, flow_run)
 
 
+def test_resolve_raises_when_created_by_is_schedule_type(worker):
+    """Scheduler-created runs (type=SCHEDULE) must not be used as user identity."""
+    cfg = make_config(connection_name=None, hpc_system="issy")
+    flow_run = FlowRun.construct(
+        id=uuid.uuid4(),
+        flow_id=uuid.uuid4(),
+        name="test-run",
+        created_by=CreatedBy(type="SCHEDULE", display_value="CronSchedule"),
+        tags=[],
+        labels={},
+        parameters={},
+        state=None,
+    )
+    with pytest.raises(AttributeError, match="Cannot determine SLURM connection"):
+        worker._resolve_connection_name(cfg, flow_run)
+
+
 # ---------------------------------------------------------------------------
 # Task 4: _parse_infrastructure_pid
 # ---------------------------------------------------------------------------
