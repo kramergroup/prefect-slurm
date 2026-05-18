@@ -15,6 +15,7 @@ the CLI-based client is the way to go.
 """
 
 import abc
+import shlex
 from enum import Enum
 from io import TextIOBase
 
@@ -254,9 +255,13 @@ class CLIBasedSlurmBackend(SlurmBackend):
         :slurm_kwargs: dictionary of parameters passed to sbatch
         """
 
-        # Create the arguments from slurm_kwargs
+        # Create the arguments from slurm_kwargs.
+        # shlex.quote() wraps the value in single quotes so the remote shell
+        # treats it as a single token even when it contains spaces, commas, or
+        # other metacharacters (e.g. env-var values injected by Prefect).
         args = [
-            f"--{k}" if v is None else f"--{k}={v}" for k, v in slurm_kwargs.items()
+            f"--{k}" if v is None else f"--{k}={shlex.quote(str(v))}"
+            for k, v in slurm_kwargs.items()
         ]
         cmd = " ".join(["sbatch", "--parsable"] + args)
 
