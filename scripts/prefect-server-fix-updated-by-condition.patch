@@ -1,0 +1,10 @@
+--- deployments.py.orig
++++ deployments.py.patched
+@@ -83,6 +83,6 @@
+ 
+     data = deployment.model_dump(exclude_unset=True)
+     data["created_by"] = created_by.model_dump() if created_by else None
+-    data["updated_by"] = updated_by.model_dump() if created_by else None
++    data["updated_by"] = updated_by.model_dump() if updated_by else None
+ 
+     async with db.session_context(begin_transaction=True) as session:

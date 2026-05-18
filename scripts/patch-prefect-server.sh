@@ -20,6 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PATCH_FILE="${SCRIPT_DIR}/prefect-server-x-remote-user.patch"
 PATCH_FILE_2="${SCRIPT_DIR}/prefect-server-propagate-created-by.patch"
 PATCH_FILE_3="${SCRIPT_DIR}/prefect-server-propagate-created-by-deployments.patch"
+PATCH_FILE_4="${SCRIPT_DIR}/prefect-server-fix-updated-by-condition.patch"
 
 VERSION=""
 REGISTRY=""
@@ -46,6 +47,7 @@ done
 [[ -f "$PATCH_FILE"   ]] || { echo "ERROR: patch file not found: $PATCH_FILE";   exit 1; }
 [[ -f "$PATCH_FILE_2" ]] || { echo "ERROR: patch file not found: $PATCH_FILE_2"; exit 1; }
 [[ -f "$PATCH_FILE_3" ]] || { echo "ERROR: patch file not found: $PATCH_FILE_3"; exit 1; }
+[[ -f "$PATCH_FILE_4" ]] || { echo "ERROR: patch file not found: $PATCH_FILE_4"; exit 1; }
 
 BASE_IMAGE_VERSION="${VERSION}-python${PYTHON_VERSION:-3.14}-kubernetes"
 
@@ -82,6 +84,10 @@ echo "==> Applying created_by propagation patch (deployments.py)..."
 patch --forward "$DEPLOYMENTS_FILE" < "$PATCH_FILE_3" \
     || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
 
+echo "==> Applying updated_by condition fix (deployments.py)..."
+patch --forward "$DEPLOYMENTS_FILE" < "$PATCH_FILE_4" \
+    || { echo "ERROR: patch failed — is the patch generated against Prefect version ${VERSION}?"; exit 1; }
+
 FULL_TAG="${REGISTRY}/${IMAGE_NAME}:${VERSION}-patched"
 LATEST_TAG="${REGISTRY}/${IMAGE_NAME}:latest-patched"
 
@@ -101,6 +107,7 @@ RUN SITE=\$(python -c "import prefect, os; print(os.path.dirname(prefect.__file_
 # Runtime-configurable — override in your container environment
 ENV PREFECT_SERVER_USER_HEADER=x-remote-user
 ENV PREFECT_SERVER_USER_HEADER_REGEX=
+ENV PREFECT_SERVER_TYPE_HEADER=x-remote-type
 DOCKERFILE
 
 cp "$DEPS_FILE"        "$WORKDIR/dependencies.py"
