@@ -17,7 +17,7 @@ the CLI-based client is the way to go.
 import abc
 import shlex
 from enum import Enum
-from io import TextIOBase
+from io import StringIO, TextIOBase
 
 import asyncssh
 from httpx import URL
@@ -165,9 +165,18 @@ class CLIBasedSlurmBackend(SlurmBackend):
         :grace_seconds: timeout for executing sbatch on the hpc system
         """
 
+        # The environment goes into the script, not into --export: sbatch treats
+        # --export=<vars> as an implicit --get-user-env, and the job is requeued
+        # and held when retrieving the login environment fails on the node.
+        slurm_kwargs = job_definition.to_kwargs()
+        slurm_kwargs.pop("export", None)
+        script = self._export_environment(
+            run_script.read() if run_script else "", job_definition.environment
+        )
+
         result = await self._run_remote_command(
-            cmd=self._submit_command(job_definition.to_kwargs()),
-            in_stream=run_script,
+            cmd=self._submit_command(slurm_kwargs),
+            in_stream=StringIO(script),
             grace_seconds=grace_seconds,
         )
         try:
@@ -266,6 +275,32 @@ class CLIBasedSlurmBackend(SlurmBackend):
         cmd = " ".join(["sbatch", "--parsable"] + args)
 
         return cmd
+
+    @staticmethod
+    def _export_environment(script: str, environment: dict[str, str]) -> str:
+        """
+        Inserts an export line per environment variable into the job script,
+        after the shebang and #SBATCH directives (sbatch stops reading
+        directives at the first command)
+
+        :script: the job script
+        :environment: variables to export in the job
+        """
+
+        lines = script.split("\n")
+        header = 0
+        while header < len(lines) and (
+            lines[header].startswith("#") or not lines[header].strip()
+        ):
+            header += 1
+
+        exports = [
+            f"export {k}={shlex.quote(str(v))}"
+            for k, v in environment.items()
+            if v is not None
+        ]
+
+        return "\n".join(lines[:header] + exports + lines[header:])
 
     def _kill_command(self, jobid: int) -> str:
         """
